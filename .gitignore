@@ -1,0 +1,7 @@
+.vs/
+.idea/
+env/
+wallpaper/
+records/
+config/info.json
+__pycache__/

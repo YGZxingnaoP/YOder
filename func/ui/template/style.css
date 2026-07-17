@@ -1,0 +1,180 @@
+/* ==================== CSS Variables ==================== */
+:root {
+    --bg: #c8ccd4;
+    --sidebar-bg: rgba(255, 255, 255, 0.35);
+    --wallpaper-opacity: 0.35;
+    --wallpaper-path: '';
+    --btn-bg: #ccc;
+    --btn-hover: #aaa;
+    --btn-text: #333;
+    --accent-color: #007aff;
+    --glass-border: rgba(255,255,255,0.45);
+    --glass-shadow: 0 2px 16px rgba(0,0,0,0.06);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+    background: linear-gradient(135deg, #b8bcc8 0%, #d0d4de 40%, #c4c8d4 70%, #b0b8c8 100%);
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
+
+/* ==================== 左侧边栏 ==================== */
+.sidebar-left {
+    width: 240px; min-width: 150px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--glass-border);
+    display: flex; flex-direction: column;
+    overflow: hidden; z-index: 2;
+}
+.sidebar-left h3 { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.25); margin: 0; font-size: 14px; color: #444; text-shadow: 0 1px 2px rgba(255,255,255,0.5); }
+#conv-list { flex: 1; overflow-y: auto; list-style: none; padding: 8px; margin: 0; }
+#conv-list li {
+    padding: 8px 12px; cursor: pointer; border-radius: 6px; margin-bottom: 2px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; transition: background 0.15s;
+}
+#conv-list li:hover { background: rgba(255,255,255,0.25); }
+#conv-list li.active { background: rgba(0,122,255,0.18); color: var(--accent-color); font-weight: 600; box-shadow: inset 0 0 0 1px rgba(0,122,255,0.15); }
+.action-btn { background: none; border: none; cursor: pointer; font-size: 12px; color: #666; padding: 2px 4px; border-radius: 4px; transition: background 0.15s; }
+.action-btn:hover { background: rgba(255,255,255,0.3); color: #333; }
+.sidebar-left > button { margin: 12px; padding: 8px; border: none; background: var(--accent-color); color: white; border-radius: 8px; cursor: pointer; font-weight: 500; transition: opacity 0.2s, box-shadow 0.2s; box-shadow: 0 2px 8px rgba(0,122,255,0.25); }
+.sidebar-left > button:hover { opacity: 0.9; box-shadow: 0 4px 12px rgba(0,122,255,0.35); }
+
+/* ==================== 主区域 ==================== */
+.main-area { flex: 1; display: flex; flex-direction: column; position: relative; background: transparent; overflow: hidden; z-index: 1; }
+.chat-background { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: var(--wallpaper-path); background-size: cover; background-position: center; opacity: var(--wallpaper-opacity); z-index: 0; pointer-events: none; }
+.chat-area { flex: 1; overflow-y: auto; padding: 24px; position: relative; z-index: 1; }
+
+/* ==================== 消息气泡 ==================== */
+.message { margin-bottom: 20px; display: flex; position: relative; z-index: 1; }
+.message.user { flex-direction: row-reverse; }
+.message.user .avatar { margin-right: 0; margin-left: 12px; }
+.message.user .content { border-top-right-radius: 12px; border-top-left-radius: 4px; }
+.message.assistant .avatar { margin-right: 12px; }
+
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.8); color: #555; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(255,255,255,0.3); }
+.model-tag { font-size: 11px; color: #666; margin-left: 8px; background: rgba(255,255,255,0.6); padding: 2px 6px; border-radius: 4px; }
+
+/* 对话框毛玻璃 */
+.content {
+    background: rgba(255,255,255,0.85);
+    padding: 16px 22px;
+    border-radius: 14px;
+    max-width: 85%;
+    word-break: break-word;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.35);
+    line-height: 1.75;
+    font-size: 14.5px;
+}
+.user .content { background: rgba(0,122,255,0.92); color: white; line-height: 1.6; box-shadow: 0 2px 12px rgba(0,122,255,0.2), inset 0 0 0 1px rgba(255,255,255,0.15); }
+.user .avatar { background: rgba(200,225,255,0.8); color: var(--accent-color); }
+.error-msg .content { background: rgba(255,220,220,0.9); color: #d32f2f; box-shadow: 0 2px 12px rgba(211,47,47,0.1), inset 0 0 0 1px rgba(211,47,47,0.15); }
+
+/* 流式渲染状态 - 纯文本展示，避免重排 */
+.content.is-streaming {
+    white-space: pre-wrap;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13.5px;
+    line-height: 1.6;
+}
+
+/* ==================== 思考过程 ==================== */
+.thinking-block { border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 12px; margin-bottom: 12px; }
+.assistant .content .thinking-block { background: transparent; padding: 0; border-radius: 0; box-shadow: none; }
+details.thinking-details summary { list-style: none; cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; color: #666; display: flex; align-items: center; }
+details.thinking-details summary::before { content: '\25B8'; margin-right: 6px; transition: transform 0.2s; display: inline-block; }
+details.thinking-details[open] summary::before { transform: rotate(90deg); }
+.thinking-content { margin-top: 8px; padding: 12px; background: rgba(0,0,0,0.04); border-left: 3px solid rgba(0,0,0,0.12); border-radius: 4px; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #555; font-family: 'Consolas','Monaco',monospace; max-height: 300px; overflow-y: auto; }
+
+/* ==================== 文件卡片 ==================== */
+.file-card { margin: 10px 0; background: rgba(255,255,255,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.35); }
+.file-card summary { padding: 10px 14px; cursor: pointer; font-size: 13px; color: #333; display: flex; align-items: center; gap: 8px; user-select: none; }
+.file-card summary:hover { background: rgba(255,255,255,0.2); border-radius: 8px; }
+.file-card .file-path { color: #888; font-size: 11px; margin-left: 8px; }
+.file-card pre { margin: 0; padding: 12px; background: #282c34; color: #abb2bf; border-radius: 0 0 8px 8px; overflow-x: auto; font-size: 12px; max-height: 300px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.1); }
+.file-card pre code { background: transparent !important; padding: 0 !important; }
+
+/* ==================== KaTeX ==================== */
+.katex-display { background: rgba(255,255,255,0.65); border-radius: 10px; padding: 16px; margin: 12px 0; overflow-x: auto; text-align: center; border: 1px solid rgba(255,255,255,0.35); }
+.katex-display > .katex { text-align: center; }
+
+/* ==================== 输入区域 ==================== */
+.input-container { background: rgba(255,255,255,0.75); border-top: 1px solid var(--glass-border); padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; position: relative; z-index: 2; min-height: 100px; max-height: 60vh; flex-shrink: 0; contain: layout style; }
+.input-row { display: flex; gap: 10px; align-items: center; }
+.input-row:first-child { flex-shrink: 0; }
+.input-row:last-child { flex: 1; align-items: stretch; position: relative; min-height: 40px; }
+#folder-path { flex: 1; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.4); border-radius: 8px; background: rgba(255,255,255,0.7); outline: none; font-size: 13px; }
+#user-input { flex: 1; width: 100%; height: 100%; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.4); border-radius: 8px; background: rgba(255,255,255,0.7); outline: none; font-family: inherit; font-size: 14px; resize: none; overflow-y: auto; transition: border-color 0.2s, box-shadow 0.2s; line-height: 1.5; }
+#folder-path:focus, #user-input:focus { border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(0,122,255,0.15); }
+.send-btn, .load-btn { padding: 8px 16px; border: none; border-radius: 8px; background: var(--accent-color); color: white; cursor: pointer; font-weight: 500; transition: opacity 0.2s; white-space: nowrap; }
+.send-btn:hover, .load-btn:hover { opacity: 0.9; }
+.send-btn:disabled, .load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.settings-btn { position: absolute; bottom: 12px; left: 12px; background: none; border: none; font-size: 18px; cursor: pointer; opacity: 0.4; transition: opacity 0.2s; z-index: 10; }
+.settings-btn:hover { opacity: 0.8; }
+
+/* ==================== 右侧边栏 ==================== */
+.sidebar-right { width: 0; min-width: 0; background: rgba(255,255,255,0.7); border-left: 1px solid var(--glass-border); overflow: hidden; display: flex; flex-direction: column; z-index: 2; transition: width 0.25s ease; }
+.sidebar-right.open { width: 360px; min-width: 260px; }
+.sidebar-right .header { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.25); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.15); }
+.sidebar-right .header button { background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.3); padding: 4px 10px; border-radius: 6px; cursor: pointer; color: #444; font-size: 12px; margin-left: 6px; transition: background 0.15s; }
+.sidebar-right .header button:hover { background: rgba(255,255,255,0.4); }
+.file-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 12px; margin: 0; font-size: 13px; }
+.file-tree ul { list-style: none; padding-left: 16px; margin: 0; }
+.file-tree > ul { padding-left: 0; }
+.file-tree li { position: relative; padding: 0; margin: 2px 0; line-height: 1.5; }
+.file-tree .node-content { display: flex; align-items: center; padding: 5px 8px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+.file-tree .node-content:hover { background: rgba(255,255,255,0.25); }
+.file-tree .toggle-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; margin-right: 4px; font-size: 10px; color: #888; transition: transform 0.2s; flex-shrink: 0; }
+.file-tree .toggle-icon.collapsed { transform: rotate(-90deg); }
+.file-tree input[type="checkbox"] { margin-right: 8px; accent-color: var(--accent-color); cursor: pointer; }
+.file-tree .node-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
+.file-tree .token-info { margin-left: 8px; color: #999; font-size: 11px; background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px; }
+.file-tree ul.collapsed { display: none; }
+
+/* ==================== 渲染内容 ==================== */
+.content.rendered { white-space: normal; }
+.content.rendered p { margin-bottom: 12px; line-height: 1.8; }
+.content.rendered p:last-child { margin-bottom: 0; }
+
+.assistant-output { margin-top: 0; }
+.thinking-block + .assistant-text { margin-top: 12px; }
+
+pre { background: #282c34; color: #abb2bf; border-radius: 10px; padding: 16px; overflow-x: auto; margin: 12px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
+pre code { background: transparent !important; padding: 0 !important; font-family: 'Fira Code','Consolas',monospace; font-size: 13px; }
+code { background: rgba(0,0,0,0.06); padding: 2px 4px; border-radius: 4px; font-size: 0.9em; }
+
+/* ==================== 拖拽分隔条 ==================== */
+.resizer { background: transparent; transition: background 0.2s; z-index: 10; }
+.resizer:hover { background: rgba(0,122,255,0.3); }
+.resizer-vertical { width: 5px; cursor: col-resize; }
+.resizer-horizontal { height: 5px; cursor: row-resize; }
+
+/* ==================== 操作按钮 ==================== */
+.msg-actions { margin-top: 8px; display: flex; gap: 8px; }
+.regen-btn { background: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; padding: 4px 10px; font-size: 12px; color: #555; cursor: pointer; transition: all 0.2s; }
+.regen-btn:hover { background: rgba(255,255,255,0.35); color: #333; border-color: rgba(255,255,255,0.5); }
+.message.user .regen-btn { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.1); }
+.message.user .regen-btn:hover { background: rgba(255,255,255,0.2); color: white; }
+
+/* ==================== 代码复制按钮 ==================== */
+.code-copy-btn {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    color: #abb2bf; padding: 4px 10px; border-radius: 6px;
+    font-size: 12px; cursor: pointer; opacity: 0; transition: opacity 0.2s;
+}
+pre:hover .code-copy-btn { opacity: 1; }
+.code-copy-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.code-copy-btn.copied { background: #51cf66; color: #fff; border-color: #51cf66; opacity: 1; }
+

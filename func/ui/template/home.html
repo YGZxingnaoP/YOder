@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI 代码辅助</title>
+    <script src="../lib/marked.min.js"></script>
+    <link rel="stylesheet" href="../lib/atom-one-dark.min.css" />
+    <script src="../lib/highlight.min.js"></script>
+    <link rel="stylesheet" href="../lib/katex.min.css" />
+    <script src="../lib/katex.min.js"></script>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="sidebar-left" id="sidebar-left">
+    <h3>💬 对话列表</h3>
+    <ul id="conv-list"></ul>
+    <button id="new-conv-btn">+ 新建对话</button>
+</div>
+<div class="resizer resizer-vertical" id="resizer-left"></div>
+<div class="main-area" id="main-area">
+    <div class="chat-background" id="chat-background"></div>
+    <div class="chat-area" id="chat-area"></div>
+    <div class="resizer resizer-horizontal" id="resizer-input"></div>
+    <div class="input-container" id="input-container">
+        <div class="input-row">
+            <input type="text" id="folder-path" placeholder="输入文件夹路径（回车加载）" />
+            <button class="load-btn" id="load-folder-btn">加载</button>
+        </div>
+        <div class="input-row">
+            <textarea id="user-input" placeholder="输入消息...（Enter 换行，Ctrl+Enter 发送）"></textarea>
+            <button class="send-btn" id="send-btn">发送</button>
+            <button class="settings-btn" id="settings-btn" title="设置">⚙️</button>
+        </div>
+    </div>
+</div>
+<div class="resizer resizer-vertical" id="resizer-right" style="display:none;"></div>
+<div class="sidebar-right" id="sidebar-right">
+    <div class="header">
+        <span style="font-weight:600; font-size:14px;">📁 文件列表</span>
+        <div>
+            <button id="select-all-btn">全选</button>
+            <button id="deselect-all-btn">清空</button>
+        </div>
+    </div>
+    <div class="file-tree" id="file-tree"></div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
