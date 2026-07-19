@@ -145,17 +145,8 @@ function addUserMessage(text, filesJson) {
         } catch(e) {}
     }
 
-    var actionsDiv = document.createElement('div');
-    actionsDiv.className = 'msg-actions';
-    var regenBtn = document.createElement('button');
-    regenBtn.className = 'regen-btn';
-    regenBtn.textContent = '\uD83D\uDD04 \u91CD\u65B0\u751F\u6210';
-    regenBtn.onclick = function(e) { e.stopPropagation(); regenerate(this); };
-    actionsDiv.appendChild(regenBtn);
-
     div.innerHTML = '<div class="avatar">\uD83D\uDC64</div>';
     div.appendChild(contentDiv);
-    div.appendChild(actionsDiv);
     chatArea.appendChild(div);
     chatArea.scrollTop = chatArea.scrollHeight;
     return div;
@@ -163,12 +154,19 @@ function addUserMessage(text, filesJson) {
 
 function regenerate(btn) {
     if (sendDisabled || !isBridgeReady()) return;
-    var msgDiv = btn.closest('.message.user');
-    if (!msgDiv) return;
+    var assistantMsg = btn.closest('.message.assistant');
+    if (!assistantMsg) return;
     if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
     currentAssistantMsgDiv = null; currentThinkingBlock = null; currentAssistantBlock = null; currentRawText = "";
-    var text = msgDiv.dataset.text, filesJson = msgDiv.dataset.files, sibling = msgDiv;
-    while (sibling) { var next = sibling.nextSibling; sibling.remove(); sibling = next; }
+    // 向前查找对应的用户消息
+    var userMsg = assistantMsg.previousElementSibling;
+    while (userMsg && !userMsg.classList.contains('message') || (userMsg && !userMsg.classList.contains('user'))) {
+        userMsg = userMsg ? userMsg.previousElementSibling : null;
+    }
+    if (!userMsg) return;
+    var text = userMsg.dataset.text, filesJson = userMsg.dataset.files;
+    // 只移除 AI 回复，保留用户消息
+    assistantMsg.remove();
     sendDisabled = true;
     var sendBtn = document.getElementById('send-btn');
     if (sendBtn) sendBtn.disabled = true;
@@ -258,6 +256,14 @@ function finishMessage(model) {
         addCopyButtons(currentAssistantBlock);
         var tag = currentAssistantMsgDiv ? currentAssistantMsgDiv.querySelector('.model-tag') : null;
         if (tag) tag.textContent = model;
+        var actionsDiv = document.createElement('div');
+        actionsDiv.className = 'msg-actions';
+        var regenBtn = document.createElement('button');
+        regenBtn.className = 'regen-btn';
+        regenBtn.textContent = '\uD83D\uDD04 \u91CD\u65B0\u751F\u6210';
+        regenBtn.onclick = function(e) { e.stopPropagation(); regenerate(this); };
+        actionsDiv.appendChild(regenBtn);
+        currentAssistantMsgDiv.appendChild(actionsDiv);
     }
     currentAssistantMsgDiv = null; currentThinkingBlock = null; currentAssistantBlock = null; currentRawText = "";
     var chatArea = document.getElementById('chat-area');
@@ -358,6 +364,14 @@ function loadHistory(messages) {
             contentDiv.appendChild(actualDiv);
             div.innerHTML = '<div class="avatar">\uD83E\uDD16</div>';
             div.appendChild(contentDiv);
+            var actionsDiv = document.createElement('div');
+            actionsDiv.className = 'msg-actions';
+            var regenBtn = document.createElement('button');
+            regenBtn.className = 'regen-btn';
+            regenBtn.textContent = '\uD83D\uDD04 \u91CD\u65B0\u751F\u6210';
+            regenBtn.onclick = function(e) { e.stopPropagation(); regenerate(this); };
+            actionsDiv.appendChild(regenBtn);
+            div.appendChild(actionsDiv);
             chatArea.appendChild(div);
         }
     });
