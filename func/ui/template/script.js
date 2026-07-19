@@ -136,7 +136,8 @@ function addUserMessage(text, filesJson) {
                 summary.innerHTML = '\uD83D\uDCC4 <strong>' + fileName + '</strong> <span class="file-path">' + fpath + '</span>';
                 var pre = document.createElement('pre');
                 var code = document.createElement('code');
-                code.textContent = "[\u6587\u4EF6\u5185\u5BB9\u5DF2\u63D0\u4EA4\uFF0C\u53EF\u5728\u5386\u53F2\u5BF9\u8BDD\u4E2D\u5C55\u5F00\u67E5\u770B]";
+                pre.setAttribute('data-path', fpath);
+                code.textContent = "\u6B63\u5728\u8BFB\u53D6\u6587\u4EF6...";
                 pre.appendChild(code);
                 details.appendChild(summary);
                 details.appendChild(pre);
@@ -146,10 +147,35 @@ function addUserMessage(text, filesJson) {
     }
 
     div.innerHTML = '<div class="avatar">\uD83D\uDC64</div>';
+    var deleteBtn = document.createElement('button');
+    deleteBtn.className = 'msg-delete';
+    deleteBtn.textContent = '\u2715';
+    deleteBtn.title = '\u5220\u9664\u8FD9\u4E00\u8F6E';
+    deleteBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:14px;color:rgba(255,255,255,0.5);padding:2px 8px;margin-right:4px;border-radius:4px;order:-1;align-self:center;flex-shrink:0;';
+    deleteBtn.onmouseenter = function() { this.style.color = '#ff4444'; this.style.background = 'rgba(255,68,68,0.15)'; };
+    deleteBtn.onmouseleave = function() { this.style.color = 'rgba(255,255,255,0.5)'; this.style.background = 'none'; };
+    deleteBtn.onclick = function(e) { e.stopPropagation(); deleteTurn(this); };
     div.appendChild(contentDiv);
+    div.appendChild(deleteBtn);
     chatArea.appendChild(div);
     chatArea.scrollTop = chatArea.scrollHeight;
     return div;
+}
+
+function deleteTurn(btn) {
+    if (sendDisabled || !isBridgeReady()) return;
+    var userMsg = btn.closest('.message.user');
+    if (!userMsg) return;
+    var chatArea = document.getElementById('chat-area');
+    if (!chatArea) return;
+    // 计算该 user 消息在 current_messages 数组中的索引
+    var allMsgs = Array.from(chatArea.querySelectorAll('.message'));
+    var userIndex = -1;
+    for (var i = 0; i < allMsgs.length; i++) {
+        if (allMsgs[i] === userMsg) { userIndex = i; break; }
+    }
+    if (userIndex < 0) return;
+    bridge.delete_turn(String(userIndex));
 }
 
 function regenerate(btn) {
@@ -332,16 +358,17 @@ function loadHistory(messages) {
                     }
                 });
             } else { contentDiv.textContent = msg.content; }
-            var actionsDiv = document.createElement('div');
-            actionsDiv.className = 'msg-actions';
-            var regenBtn = document.createElement('button');
-            regenBtn.className = 'regen-btn';
-            regenBtn.textContent = '\uD83D\uDD04 \u91CD\u65B0\u751F\u6210';
-            regenBtn.onclick = function(e) { e.stopPropagation(); regenerate(this); };
-            actionsDiv.appendChild(regenBtn);
+            var deleteBtn = document.createElement('button');
+            deleteBtn.className = 'msg-delete';
+            deleteBtn.textContent = '\u2715';
+            deleteBtn.title = '\u5220\u9664\u8FD9\u4E00\u8F6E';
+            deleteBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:14px;color:rgba(255,255,255,0.5);padding:2px 8px;margin-right:4px;border-radius:4px;order:-1;align-self:center;flex-shrink:0;';
+            deleteBtn.onmouseenter = function() { this.style.color = '#ff4444'; this.style.background = 'rgba(255,68,68,0.15)'; };
+            deleteBtn.onmouseleave = function() { this.style.color = 'rgba(255,255,255,0.5)'; this.style.background = 'none'; };
+            deleteBtn.onclick = function(e) { e.stopPropagation(); deleteTurn(this); };
             div.innerHTML = '<div class="avatar">\uD83D\uDC64</div>';
             div.appendChild(contentDiv);
-            div.appendChild(actionsDiv);
+            div.appendChild(deleteBtn);
             chatArea.appendChild(div);
         } else if (msg.role === 'assistant') {
             var div = document.createElement('div');
@@ -425,6 +452,21 @@ function send() {
 }
 function handleEmptySendClick(){if(wallpaperDialogOpen)return;if(clickTimer)clearTimeout(clickTimer);clickCount++;clickTimer=setTimeout(function(){resetClickCount();},3000);if(clickCount>=5){resetClickCount();wallpaperDialogOpen=true;if(bridge)bridge.open_wallpaper_settings();}}
 function resetClickCount(){clickCount=0;if(clickTimer){clearTimeout(clickTimer);clickTimer=null;}}
+function fillFileContents(contentsJson) {
+    try {
+        var contents = JSON.parse(contentsJson);
+        for (var fpath in contents) {
+            var pres = document.querySelectorAll('pre[data-path]');
+            for (var i = 0; i < pres.length; i++) {
+                if (pres[i].getAttribute('data-path') === fpath) {
+                    var codeElem = pres[i].querySelector('code');
+                    if (codeElem) codeElem.textContent = contents[fpath];
+                }
+            }
+        }
+    } catch(e) {}
+}
+
 function enableSendButton(){sendDisabled=false;var s=document.getElementById('send-btn');if(s)s.disabled=false;lastUserMessageElem=null;pendingInputText='';}
 function onWallpaperSettingsClosed(){wallpaperDialogOpen=false;}
 function setWallpaper(p,o){document.documentElement.style.setProperty('--wallpaper-path','url('+p+')');document.documentElement.style.setProperty('--wallpaper-opacity',o);}

@@ -160,6 +160,10 @@
         .regen-btn:hover { background: rgba(255,255,255,0.35); color: #333; border-color: rgba(255,255,255,0.5); }
         .message.assistant .msg-actions { justify-content: flex-end; }
 
+        /* 删除按钮 */
+        .message.user .msg-delete { background: none; border: none; cursor: pointer; font-size: 14px; color: rgba(255,255,255,0.5); padding: 2px 8px; margin-right: 4px; border-radius: 4px; order: -1; align-self: center; flex-shrink: 0; transition: color 0.2s, background 0.2s; }
+        .message.user .msg-delete:hover { color: #ff4444; background: rgba(255,68,68,0.15); }
+
         .code-copy-btn {
             position: absolute; top: 8px; right: 8px;
             background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
@@ -344,7 +348,8 @@
                     summary.innerHTML = '📄 <strong>' + fileName + '</strong> <span class="file-path">' + fpath + '</span>';
                     var pre = document.createElement('pre');
                     var code = document.createElement('code');
-                    code.textContent = "[文件内容已提交，可在历史对话中展开查看]";
+                    pre.setAttribute('data-path', fpath);
+                    code.textContent = "正在读取文件...";
                     pre.appendChild(code);
                     details.appendChild(summary);
                     details.appendChild(pre);
@@ -354,9 +359,33 @@
         }
 
         div.innerHTML = '<div class="avatar">👤</div>';
+        var deleteBtn = document.createElement('button');
+        deleteBtn.className = 'msg-delete';
+        deleteBtn.textContent = '✕';
+        deleteBtn.title = '删除这一轮';
+        deleteBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:14px;color:rgba(255,255,255,0.5);padding:2px 8px;margin-right:4px;border-radius:4px;order:-1;align-self:center;flex-shrink:0;';
+        deleteBtn.onmouseenter = function() { this.style.color = '#ff4444'; this.style.background = 'rgba(255,68,68,0.15)'; };
+        deleteBtn.onmouseleave = function() { this.style.color = 'rgba(255,255,255,0.5)'; this.style.background = 'none'; };
+        deleteBtn.onclick = function(e) { e.stopPropagation(); deleteTurn(this); };
         div.appendChild(contentDiv);
+        div.appendChild(deleteBtn);
         chatArea.appendChild(div);
         return div;
+    }
+
+    function deleteTurn(btn) {
+        if (sendDisabled || !isBridgeReady()) return;
+        var userMsg = btn.closest('.message.user');
+        if (!userMsg) return;
+        var chatArea = document.getElementById('chat-area');
+        if (!chatArea) return;
+        var allMsgs = Array.from(chatArea.querySelectorAll('.message'));
+        var userIndex = -1;
+        for (var i = 0; i < allMsgs.length; i++) {
+            if (allMsgs[i] === userMsg) { userIndex = i; break; }
+        }
+        if (userIndex < 0) return;
+        bridge.delete_turn(String(userIndex));
     }
 
     function regenerate(btn) {
@@ -528,16 +557,17 @@
                         }
                     });
                 } else { contentDiv.textContent = msg.content; }
-                var actionsDiv = document.createElement('div');
-                actionsDiv.className = 'msg-actions';
-                var regenBtn = document.createElement('button');
-                regenBtn.className = 'regen-btn';
-                regenBtn.textContent = '🔄 重新生成';
-                regenBtn.onclick = function(e) { e.stopPropagation(); regenerate(this); };
-                actionsDiv.appendChild(regenBtn);
+                var deleteBtn = document.createElement('button');
+                deleteBtn.className = 'msg-delete';
+                deleteBtn.textContent = '✕';
+                deleteBtn.title = '删除这一轮';
+                deleteBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:14px;color:rgba(255,255,255,0.5);padding:2px 8px;margin-right:4px;border-radius:4px;order:-1;align-self:center;flex-shrink:0;';
+                deleteBtn.onmouseenter = function() { this.style.color = '#ff4444'; this.style.background = 'rgba(255,68,68,0.15)'; };
+                deleteBtn.onmouseleave = function() { this.style.color = 'rgba(255,255,255,0.5)'; this.style.background = 'none'; };
+                deleteBtn.onclick = function(e) { e.stopPropagation(); deleteTurn(this); };
                 div.innerHTML = '<div class="avatar">👤</div>';
                 div.appendChild(contentDiv);
-                div.appendChild(actionsDiv);
+                div.appendChild(deleteBtn);
                 chatArea.appendChild(div);
             } else if (msg.role === 'assistant') {
                 var div = document.createElement('div');
@@ -612,6 +642,21 @@
     }
     function handleEmptySendClick(){if(wallpaperDialogOpen)return;if(clickTimer)clearTimeout(clickTimer);clickCount++;clickTimer=setTimeout(function(){resetClickCount();},3000);if(clickCount>=5){resetClickCount();wallpaperDialogOpen=true;if(bridge)bridge.open_wallpaper_settings();}}
     function resetClickCount(){clickCount=0;if(clickTimer){clearTimeout(clickTimer);clickTimer=null;}}
+    function fillFileContents(contentsJson) {
+        try {
+            var contents = JSON.parse(contentsJson);
+            for (var fpath in contents) {
+                var pres = document.querySelectorAll('pre[data-path]');
+                for (var i = 0; i < pres.length; i++) {
+                    if (pres[i].getAttribute('data-path') === fpath) {
+                        var codeElem = pres[i].querySelector('code');
+                        if (codeElem) codeElem.textContent = contents[fpath];
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+
     function enableSendButton(){sendDisabled=false;var s=document.getElementById('send-btn');if(s)s.disabled=false;lastUserMessageElem=null;pendingInputText='';}
     function onWallpaperSettingsClosed(){wallpaperDialogOpen=false;}
     function setWallpaper(p,o){document.documentElement.style.setProperty('--wallpaper-path','url('+p+')');document.documentElement.style.setProperty('--wallpaper-opacity',o);}

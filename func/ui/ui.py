@@ -219,6 +219,18 @@ class Bridge(QObject):
         self.worker_thread.finished.connect(self.worker_thread.deleteLater)
         self.worker.finished.connect(self._on_stream_finished)
         self.worker_thread.start()
+        # 读取文件内容推送给前端显示
+        if files:
+            file_contents = {}
+            for fpath in files:
+                if os.path.isfile(fpath):
+                    try:
+                        with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
+                            file_contents[fpath] = f.read()
+                    except Exception:
+                        pass
+            if file_contents:
+                self._run_js(f"fillFileContents({json.dumps(json.dumps(file_contents, ensure_ascii=False))})")
 
     @Slot(str, str)
     def send_message(self, text, files_json):
@@ -243,7 +255,32 @@ class Bridge(QObject):
             self.current_messages.pop()
         if self.current_messages and self.current_messages[-1]['role'] == 'user':
             self.current_messages.pop()
+        # 保存已移除旧回复的对话，防止旧AI回复被 load_memory 读回
+        if self.current_folder:
+            save_conversation(self.current_folder, self.current_messages)
         self._do_send(text, files)
+
+    @Slot(str)
+    def delete_turn(self, index_str):
+        """删除指定轮次（index_str 为 user 消息在 current_messages 中的索引字符串）"""
+        if self._stream_active:
+            return
+        try:
+            index = int(index_str)
+        except (ValueError, TypeError):
+            return
+        if index < 0 or index >= len(self.current_messages):
+            return
+        if self.current_messages[index]['role'] != 'user':
+            return
+        # 移除 user 消息
+        self.current_messages.pop(index)
+        # 如果后面紧跟 assistant 消息也一并移除
+        if index < len(self.current_messages) and self.current_messages[index]['role'] == 'assistant':
+            self.current_messages.pop(index)
+        if self.current_folder:
+            save_conversation(self.current_folder, self.current_messages)
+        self._run_js(f"loadHistory({json.dumps(self.current_messages)})")
 
     def _on_stream(self, type_, content):
         if type_ == "thinking":
