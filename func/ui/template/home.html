@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI 代码辅助</title>
+    <title>YODER</title>
     <script src="../lib/marked.min.js"></script>
     <link rel="stylesheet" href="../lib/atom-one-dark.min.css" />
     <script src="../lib/highlight.min.js"></script>
     <link rel="stylesheet" href="../lib/katex.min.css" />
     <script src="../lib/katex.min.js"></script>
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-    <link rel="stylesheet" href="style.css?v=3" />
+    <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
 <div class="sidebar-left" id="sidebar-left">
@@ -21,7 +21,10 @@
 <div class="resizer resizer-vertical" id="resizer-left"></div>
 <div class="main-area" id="main-area">
     <div class="chat-background" id="chat-background"></div>
+    <button class="sidebar-toggle-btn toggle-left-btn" id="toggle-left-btn" title="收起/展开对话列表">☰</button>
+    <button class="sidebar-toggle-btn toggle-summary-btn" id="toggle-summary-btn" title="展开概括内容">📝</button>
     <div class="chat-area" id="chat-area"></div>
+    <div class="model-bar" id="model-bar" style="display:none;"></div>
     <div class="resizer resizer-horizontal" id="resizer-input"></div>
     <div class="input-container" id="input-container">
         <div class="input-row">
@@ -32,11 +35,20 @@
             <textarea id="user-input" placeholder="输入消息...（Enter 换行，Ctrl+Enter 发送）"></textarea>
             <button class="send-btn" id="send-btn">发送</button>
             <button class="settings-btn" id="settings-btn" title="设置">⚙️</button>
+            <button class="memory-btn" id="memory-btn" title="记忆概括">🧠</button>
         </div>
     </div>
 </div>
+<div class="sidebar-summary" id="sidebar-summary">
+    <div class="summary-header">
+        <span>🧠 记忆概括</span>
+        <button class="summary-close-btn" id="summary-close-btn" title="关闭">✕</button>
+    </div>
+    <div class="summary-content" id="summary-content">暂无概括内容</div>
+</div>
 <div class="resizer resizer-vertical" id="resizer-right" style="display:none;"></div>
 <div class="sidebar-right" id="sidebar-right">
+    <button class="collapse-btn" id="collapse-sidebar-btn" title="收起">✕</button>
     <div class="header">
         <span style="font-weight:600; font-size:14px;">📁 文件列表</span>
         <div>
@@ -44,8 +56,13 @@
             <button id="deselect-all-btn">清空</button>
         </div>
     </div>
+    <div class="path-selector" id="path-selector">
+        <select id="path-select"></select>
+        <button id="refresh-path-btn" title="刷新">🔄</button>
+        <button id="remove-path-btn" title="移除">✕</button>
+    </div>
     <div class="file-tree" id="file-tree"></div>
 </div>
-<script src="script.js?v=3"></script>
+<script src="script.js?v=6"></script>
 </body>
 </html>

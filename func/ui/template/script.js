@@ -420,6 +420,22 @@ function clearMessages() {
 // 8. 文件树 & 侧边栏
 // ====================================================================
 function displayFileTree(tree) { var c=document.getElementById('file-tree');if(!c)return;c.innerHTML='';selectedFiles.clear();var r=document.createElement('ul');buildTreeDOM(tree,r);c.appendChild(r);selectAllFiles();openRightPanel(); }
+function clearFileTree() { var c=document.getElementById('file-tree');if(c)c.innerHTML=''; selectedFiles.clear(); var ps=document.getElementById('path-selector');if(ps)ps.style.display='none'; }
+function updatePathList(paths, currentPath) {
+    var sel = document.getElementById('path-select');
+    var ps = document.getElementById('path-selector');
+    if (!sel || !ps) return;
+    sel.innerHTML = '';
+    paths.forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p.split('\\').pop().split('/').pop();
+        opt.title = p;
+        if (p === currentPath) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    ps.style.display = paths.length > 0 ? 'flex' : 'none';
+}
 function buildTreeDOM(n,p){var l=document.createElement('li'),d=document.createElement('div');d.className='node-content';var t=document.createElement('span');t.className='toggle-icon';t.innerHTML=n.type==='directory'?'\u25BE':'';t.style.visibility=n.type==='directory'?'visible':'hidden';var c=document.createElement('input');c.type='checkbox';c.checked=true;var s=document.createElement('span');s.className='node-name';s.textContent=(n.type==='directory'?'\uD83D\uDCC1 ':'\uD83D\uDCC4 ')+n.name;d.appendChild(t);d.appendChild(c);d.appendChild(s);if(n.type==='file'){l.setAttribute('data-path',n.path);var k=document.createElement('span');k.className='token-info';k.textContent=(n.token_count||0)+' tk';d.appendChild(k);c.addEventListener('change',function(){if(this.checked)selectedFiles.add(n.path);else selectedFiles.delete(n.path);updateParentFolderCheckbox(l);});l.appendChild(d);p.appendChild(l);}else{var u=document.createElement('ul');l.appendChild(d);l.appendChild(u);if(n.children)n.children.forEach(function(h){buildTreeDOM(h,u);});var f=function(e){if(e&&e.target===c)return;u.classList.toggle('collapsed');t.classList.toggle('collapsed');};t.addEventListener('click',function(e){e.stopPropagation();f(e);});d.addEventListener('click',f);c.addEventListener('change',function(){var a=l.querySelectorAll('ul input[type="checkbox"]');a.forEach(function(b){b.checked=this.checked;var v=b.closest('[data-path]')?.getAttribute('data-path');if(v){if(this.checked)selectedFiles.add(v);else selectedFiles.delete(v);}});});p.appendChild(l);}}
 function updateParentFolderCheckbox(f){var p=f.parentElement?.closest('li');while(p&&p.querySelector('ul')){var c=p.querySelector(':scope > .node-content > input[type="checkbox"]');if(!c)break;var h=p.querySelectorAll('ul li[data-path] input[type="checkbox"]');if(h.length>0)c.checked=Array.from(h).every(function(b){return b.checked;});p=p.parentElement?.closest('li');}}
 function selectAllFiles(){document.querySelectorAll('#file-tree input[type="checkbox"]').forEach(function(c){c.checked=true;});rebuildSelectedFilesFromDOM();}
@@ -428,6 +444,45 @@ function rebuildSelectedFilesFromDOM(){selectedFiles.clear();document.querySelec
 function loadFolder(){var i=document.getElementById('folder-path');if(!i)return;var p=i.value.trim();if(p&&bridge)bridge.load_folder(p);}
 function openRightPanel(){var p=document.getElementById('sidebar-right'),r=document.getElementById('resizer-right');if(!p||!r)return;p.classList.add('open');r.style.display='block';if(p.offsetWidth===0)p.style.width='360px';}
 function closeRightPanel(){var p=document.getElementById('sidebar-right'),r=document.getElementById('resizer-right');if(p)p.classList.remove('open');if(r)r.style.display='none';if(p)p.style.width='0';selectedFiles.clear();}
+
+// ====================================================================
+// 左侧边栏收起/展开
+// ====================================================================
+function toggleLeftSidebar() {
+    var sb = document.getElementById('sidebar-left');
+    var rl = document.getElementById('resizer-left');
+    var btn = document.getElementById('toggle-left-btn');
+    if (!sb) return;
+    if (sb.classList.contains('collapsed')) {
+        sb.classList.remove('collapsed');
+        sb.style.width = '240px';
+        if (rl) rl.style.display = 'block';
+        if (btn) btn.textContent = '☰';
+    } else {
+        sb.classList.add('collapsed');
+        if (rl) rl.style.display = 'none';
+        if (btn) btn.textContent = '▶';
+    }
+}
+
+// ====================================================================
+// 概括侧边栏
+// ====================================================================
+function openSummaryPanel() {
+    var panel = document.getElementById('sidebar-summary');
+    if (!panel) return;
+    panel.classList.add('open');
+    // 从后端获取概括内容
+    if (bridge && bridge.get_summary_content) {
+        var content = bridge.get_summary_content();
+        var el = document.getElementById('summary-content');
+        if (el) el.textContent = content || '暂无概括内容';
+    }
+}
+function closeSummaryPanel() {
+    var panel = document.getElementById('sidebar-summary');
+    if (panel) panel.classList.remove('open');
+}
 
 // ====================================================================
 // 9. 发送消息
@@ -470,6 +525,38 @@ function fillFileContents(contentsJson) {
 function enableSendButton(){sendDisabled=false;var s=document.getElementById('send-btn');if(s)s.disabled=false;lastUserMessageElem=null;pendingInputText='';}
 function onWallpaperSettingsClosed(){wallpaperDialogOpen=false;}
 function setWallpaper(p,o){document.documentElement.style.setProperty('--wallpaper-path','url('+p+')');document.documentElement.style.setProperty('--wallpaper-opacity',o);}
+
+// ====================================================================
+// 模型标签 & 记忆概括状态
+// ====================================================================
+function showModelTag(model) {
+    var bar = document.getElementById('model-bar');
+    if (!bar) return;
+    if (!model) {
+        bar.innerHTML = '';
+        bar.style.display = 'none';
+        return;
+    }
+    bar.style.display = 'flex';
+    bar.innerHTML = '<span class="model-bar-label">🤖 模型:</span> ' +
+        '<span class="model-bar-name model-bar-clickable" id="model-bar-click" title="点击更改模型">' + model + ' ✎</span>';
+    document.getElementById('model-bar-click')?.addEventListener('click', function() {
+        if (bridge) bridge.open_model_dialog();
+    });
+}
+function showSummarizeStatus(text) {
+    var bar = document.getElementById('model-bar');
+    if (!bar) return;
+    var statusSpan = bar.querySelector('.summarize-status');
+    if (!statusSpan) {
+        statusSpan = document.createElement('span');
+        statusSpan.className = 'summarize-status';
+        bar.appendChild(statusSpan);
+    }
+    statusSpan.textContent = text || '';
+    if (!text) statusSpan.style.display = 'none';
+    else statusSpan.style.display = 'inline';
+}
 
 // ====================================================================
 // 10. 拖拽分隔条（rAF 节流）
@@ -577,9 +664,24 @@ function initialize() {
     document.getElementById('send-btn')?.addEventListener('click', send);
     document.getElementById('load-folder-btn')?.addEventListener('click', loadFolder);
     document.getElementById('settings-btn')?.addEventListener('click', function() { if (bridge) bridge.open_settings(); });
+    document.getElementById('memory-btn')?.addEventListener('click', function() { if (bridge) bridge.open_memory_settings(); });
     document.getElementById('new-conv-btn')?.addEventListener('click', newConversation);
     document.getElementById('select-all-btn')?.addEventListener('click', selectAllFiles);
     document.getElementById('deselect-all-btn')?.addEventListener('click', deselectAllFiles);
+    document.getElementById('collapse-sidebar-btn')?.addEventListener('click', closeRightPanel);
+    document.getElementById('toggle-left-btn')?.addEventListener('click', toggleLeftSidebar);
+    document.getElementById('toggle-summary-btn')?.addEventListener('click', openSummaryPanel);
+    document.getElementById('summary-close-btn')?.addEventListener('click', closeSummaryPanel);
+    document.getElementById('path-select')?.addEventListener('change', function() {
+        if (bridge && this.value) bridge.switch_path(this.value);
+    });
+    document.getElementById('refresh-path-btn')?.addEventListener('click', function() {
+        if (bridge) bridge.refresh_current_path();
+    });
+    document.getElementById('remove-path-btn')?.addEventListener('click', function() {
+        var sel = document.getElementById('path-select');
+        if (bridge && sel && sel.value) bridge.remove_path(sel.value);
+    });
     document.getElementById('folder-path')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); loadFolder(); } });
 
     document.getElementById('user-input')?.addEventListener('keydown', function(e) {

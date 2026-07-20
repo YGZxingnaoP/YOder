@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI 代码辅助</title>
+    <title>YODER</title>
     <script src="lib/marked.min.js"></script>
     <link rel="stylesheet" href="lib/atom-one-dark.min.css" />
     <script src="lib/highlight.min.js"></script>
@@ -11,7 +11,6 @@
     <script src="lib/katex.min.js"></script>
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
     <style>
-        /* ==================== 完整样式 ==================== */
         :root {
             --bg: #c8ccd4;
             --sidebar-bg: rgba(255, 255, 255, 0.35);
@@ -24,107 +23,98 @@
             --glass-border: rgba(255,255,255,0.45);
             --glass-shadow: 0 2px 16px rgba(0,0,0,0.06);
         }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            height: 100vh;
-            display: flex;
-            overflow: hidden;
-            background: linear-gradient(135deg, #b8bcc8 0%, #d0d4de 40%, #c4c8d4 70%, #b0b8c8 100%);
-        }
-
-        /* 自定义滚动条 */
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; height: 100vh; display: flex; overflow: hidden; background: linear-gradient(135deg, #b8bcc8 0%, #d0d4de 40%, #c4c8d4 70%, #b0b8c8 100%); }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
-
-        .sidebar-left {
-            width: 240px; min-width: 150px;
-            background: var(--sidebar-bg);
-            border-right: 1px solid var(--glass-border);
-            display: flex; flex-direction: column;
-            overflow: hidden; z-index: 2;
-        }
+        .sidebar-left { width: 240px; min-width: 0; background: var(--sidebar-bg); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; overflow: hidden; z-index: 2; transition: width 0.25s ease; }
+        .sidebar-left.collapsed { width: 0; border-right: none; }
+        .sidebar-left.collapsed > * { display: none; }
         .sidebar-left h3 { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.25); margin: 0; font-size: 14px; color: #444; text-shadow: 0 1px 2px rgba(255,255,255,0.5); }
         #conv-list { flex: 1; overflow-y: auto; list-style: none; padding: 8px; margin: 0; }
-        #conv-list li {
-            padding: 8px 12px; cursor: pointer; border-radius: 6px; margin-bottom: 2px;
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 13px; transition: background 0.15s;
-        }
+        #conv-list li { padding: 8px 12px; cursor: pointer; border-radius: 6px; margin-bottom: 2px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; transition: background 0.15s; }
         #conv-list li:hover { background: rgba(255,255,255,0.25); }
         #conv-list li.active { background: rgba(0,122,255,0.18); color: var(--accent-color); font-weight: 600; box-shadow: inset 0 0 0 1px rgba(0,122,255,0.15); }
         .action-btn { background: none; border: none; cursor: pointer; font-size: 12px; color: #666; padding: 2px 4px; border-radius: 4px; transition: background 0.15s; }
         .action-btn:hover { background: rgba(255,255,255,0.3); color: #333; }
         .sidebar-left > button { margin: 12px; padding: 8px; border: none; background: var(--accent-color); color: white; border-radius: 8px; cursor: pointer; font-weight: 500; transition: opacity 0.2s, box-shadow 0.2s; box-shadow: 0 2px 8px rgba(0,122,255,0.25); }
         .sidebar-left > button:hover { opacity: 0.9; box-shadow: 0 4px 12px rgba(0,122,255,0.35); }
-
         .main-area { flex: 1; display: flex; flex-direction: column; position: relative; background: transparent; overflow: hidden; z-index: 1; }
         .chat-background { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: var(--wallpaper-path); background-size: cover; background-position: center; opacity: var(--wallpaper-opacity); z-index: 0; pointer-events: none; }
         .chat-area { flex: 1; overflow-y: auto; padding: 24px; position: relative; z-index: 1; }
-
         .message { margin-bottom: 20px; display: flex; position: relative; z-index: 1; }
         .message.user { flex-direction: row-reverse; }
         .message.user .avatar { margin-right: 0; margin-left: 12px; }
         .message.user .content { border-top-right-radius: 12px; border-top-left-radius: 4px; }
         .message.assistant .avatar { margin-right: 12px; }
-
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.8); color: #555; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(255,255,255,0.3); }
         .model-tag { font-size: 11px; color: #666; margin-left: 8px; background: rgba(255,255,255,0.6); padding: 2px 6px; border-radius: 4px; }
-
-        /* 对话框 */
-        .content {
-            background: rgba(255,255,255,0.85);
-            padding: 16px 22px;
-            border-radius: 14px;
-            max-width: 85%;
-            word-break: break-word;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.35);
-            line-height: 1.75;
-            font-size: 14.5px;
-        }
-        .user .content { background: rgba(0,122,255,0.92); color: white; line-height: 1.6; box-shadow: 0 2px 12px rgba(0,122,255,0.2), inset 0 0 0 1px rgba(255,255,255,0.15); }
+        .content { background: rgba(255,255,255,0.85); padding: 16px 22px; border-radius: 14px; max-width: 70%; word-break: break-word; box-shadow: 0 2px 12px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.35); line-height: 1.9; font-size: 14.5px; }
+        .user .content { background: rgba(0,122,255,0.92); color: white; line-height: 1.8; box-shadow: 0 2px 12px rgba(0,122,255,0.2), inset 0 0 0 1px rgba(255,255,255,0.15); }
         .user .avatar { background: rgba(200,225,255,0.8); color: var(--accent-color); }
         .error-msg .content { background: rgba(255,220,220,0.9); color: #d32f2f; box-shadow: 0 2px 12px rgba(211,47,47,0.1), inset 0 0 0 1px rgba(211,47,47,0.15); }
-
         .thinking-block { border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 12px; margin-bottom: 12px; }
         .assistant .content .thinking-block { background: transparent; padding: 0; border-radius: 0; box-shadow: none; }
         details.thinking-details summary { list-style: none; cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; color: #666; display: flex; align-items: center; }
         details.thinking-details summary::before { content: '▸'; margin-right: 6px; transition: transform 0.2s; display: inline-block; }
         details.thinking-details[open] summary::before { transform: rotate(90deg); }
         .thinking-content { margin-top: 8px; padding: 12px; background: rgba(0,0,0,0.04); border-left: 3px solid rgba(0,0,0,0.12); border-radius: 4px; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #555; font-family: 'Consolas','Monaco',monospace; max-height: 300px; overflow-y: auto; }
-
         .file-card { margin: 10px 0; background: rgba(255,255,255,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.35); }
         .file-card summary { padding: 10px 14px; cursor: pointer; font-size: 13px; color: #333; display: flex; align-items: center; gap: 8px; user-select: none; }
         .file-card summary:hover { background: rgba(255,255,255,0.2); border-radius: 8px; }
         .file-card .file-path { color: #888; font-size: 11px; margin-left: 8px; }
         .file-card pre { margin: 0; padding: 12px; background: #282c34; color: #abb2bf; border-radius: 0 0 8px 8px; overflow-x: auto; font-size: 12px; max-height: 300px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.1); }
         .file-card pre code { background: transparent !important; padding: 0 !important; }
-
         .katex-display { background: rgba(255,255,255,0.65); border-radius: 10px; padding: 16px; margin: 12px 0; overflow-x: auto; text-align: center; border: 1px solid rgba(255,255,255,0.35); }
         .katex-display > .katex { text-align: center; }
-
         .input-container { background: rgba(255,255,255,0.75); border-top: 1px solid var(--glass-border); padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; position: relative; z-index: 2; min-height: 100px; max-height: 60vh; flex-shrink: 0; }
         .input-row { display: flex; gap: 10px; align-items: center; }
         .input-row:first-child { flex-shrink: 0; }
         .input-row:last-child { flex: 1; align-items: stretch; position: relative; min-height: 40px; }
         #folder-path { flex: 1; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.4); border-radius: 8px; background: rgba(255,255,255,0.7); outline: none; font-size: 13px; }
-        #user-input { flex: 1; width: 100%; height: 100%; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.4); border-radius: 8px; background: rgba(255,255,255,0.7); outline: none; font-family: inherit; font-size: 14px; resize: none; overflow-y: auto; transition: border-color 0.2s, box-shadow 0.2s; line-height: 1.5;}
+        #user-input { flex: 1; width: 100%; height: 100%; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.4); border-radius: 8px; background: rgba(255,255,255,0.7); outline: none; font-family: inherit; font-size: 14px; resize: none; overflow-y: auto; transition: border-color 0.2s, box-shadow 0.2s; line-height: 1.5; }
         #folder-path:focus, #user-input:focus { border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(0,122,255,0.15); }
         .send-btn, .load-btn { padding: 8px 16px; border: none; border-radius: 8px; background: var(--accent-color); color: white; cursor: pointer; font-weight: 500; transition: opacity 0.2s; white-space: nowrap; }
         .send-btn:hover, .load-btn:hover { opacity: 0.9; }
         .send-btn:disabled, .load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .settings-btn { position: absolute; bottom: 12px; left: 12px; background: none; border: none; font-size: 18px; cursor: pointer; opacity: 0.4; transition: opacity 0.2s; z-index: 10; }
         .settings-btn:hover { opacity: 0.8; }
-
-        .sidebar-right { width: 0; min-width: 0; background: rgba(255,255,255,0.7); border-left: 1px solid var(--glass-border); overflow: hidden; display: flex; flex-direction: column; z-index: 2; transition: width 0.25s ease; }
+        .memory-btn { position: absolute; bottom: 12px; left: 44px; background: none; border: none; font-size: 18px; cursor: pointer; opacity: 0.4; transition: opacity 0.2s; z-index: 10; }
+        .memory-btn:hover { opacity: 0.8; }
+        .model-bar { padding: 6px 16px; background: rgba(255,255,255,0.6); border-top: 1px solid rgba(255,255,255,0.3); font-size: 12px; color: #666; display: flex; align-items: center; gap: 8px; z-index: 2; }
+        .model-bar-label { font-weight: 600; color: #555; }
+        .model-bar-name { background: rgba(0,122,255,0.1); color: var(--accent-color); padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+        .model-bar-clickable { cursor: pointer; transition: background 0.15s, opacity 0.15s; user-select: none; }
+        .model-bar-clickable:hover { background: rgba(0,122,255,0.2); opacity: 0.85; }
+        .summarize-status { margin-left: auto; color: #888; font-size: 11px; font-style: italic; }
+        .sidebar-toggle-btn { position: absolute; top: 8px; z-index: 20; width: 24px; height: 24px; border-radius: 5px; background: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.35); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; transition: background 0.15s, color 0.15s; }
+        .sidebar-toggle-btn:hover { background: rgba(255,255,255,0.7); color: #333; }
+        .toggle-left-btn { left: 4px; }
+        .toggle-summary-btn { right: 4px; }
+        .sidebar-summary { width: 0; min-width: 0; background: rgba(255,255,255,0.7); border-left: 1px solid var(--glass-border); overflow: hidden; display: flex; flex-direction: column; z-index: 2; transition: width 0.25s ease; position: relative; }
+        .sidebar-summary.open { width: 320px; min-width: 200px; }
+        .sidebar-summary .summary-header { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.25); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.15); }
+        .sidebar-summary .summary-header span { font-weight: 600; font-size: 13px; color: #444; }
+        .sidebar-summary .summary-close-btn { background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.3); width: 24px; height: 24px; border-radius: 5px; cursor: pointer; color: #666; font-size: 12px; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+        .sidebar-summary .summary-close-btn:hover { background: rgba(255,255,255,0.4); color: #333; }
+        .summary-content { flex: 1; overflow-y: auto; padding: 12px 14px; font-size: 13px; line-height: 1.7; color: #444; white-space: pre-wrap; word-break: break-word; }
+        .sidebar-right { width: 0; min-width: 0; background: rgba(255,255,255,0.7); border-left: 1px solid var(--glass-border); overflow: hidden; display: flex; flex-direction: column; z-index: 2; transition: width 0.25s ease; position: relative; }
+        .sidebar-right:not(.open) .collapse-btn,
+        .sidebar-right:not(.open) .header,
+        .sidebar-right:not(.open) .path-selector,
+        .sidebar-right:not(.open) .file-tree { display: none; }
         .sidebar-right.open { width: 360px; min-width: 260px; }
         .sidebar-right .header { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.25); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.15); }
         .sidebar-right .header button { background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.3); padding: 4px 10px; border-radius: 6px; cursor: pointer; color: #444; font-size: 12px; margin-left: 6px; transition: background 0.15s; }
         .sidebar-right .header button:hover { background: rgba(255,255,255,0.4); }
+        .sidebar-right .collapse-btn { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.3); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; color: #666; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background 0.15s; z-index: 3; }
+        .sidebar-right .collapse-btn:hover { background: rgba(255,255,255,0.4); color: #333; }
+        .path-selector { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.1); }
+        .path-selector select { flex: 1; padding: 4px 8px; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; background: rgba(255,255,255,0.7); font-size: 12px; outline: none; }
+        .path-selector button { background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.3); padding: 4px 8px; border-radius: 6px; cursor: pointer; color: #444; font-size: 12px; transition: background 0.15s; }
+        .path-selector button:hover { background: rgba(255,255,255,0.4); }
         .file-tree { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 12px; margin: 0; font-size: 13px; }
         .file-tree ul { list-style: none; padding-left: 16px; margin: 0; }
         .file-tree > ul { padding-left: 0; }
@@ -137,39 +127,25 @@
         .file-tree .node-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
         .file-tree .token-info { margin-left: 8px; color: #999; font-size: 11px; background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px; }
         .file-tree ul.collapsed { display: none; }
-
         .content.rendered { white-space: normal; }
-        /* 优化：增加渲染后的段落间距 */
-        .content.rendered p { margin-bottom: 12px; line-height: 1.8; }
+        .content.rendered p { margin-bottom: 14px; line-height: 1.9; }
         .content.rendered p:last-child { margin-bottom: 0; }
-
         .assistant-output { margin-top: 0; }
         .thinking-block + .assistant-text { margin-top: 12px; }
-
         pre { background: #282c34; color: #abb2bf; border-radius: 10px; padding: 16px; overflow-x: auto; margin: 12px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
         pre code { background: transparent !important; padding: 0 !important; font-family: 'Fira Code','Consolas',monospace; font-size: 13px; }
         code { background: rgba(0,0,0,0.06); padding: 2px 4px; border-radius: 4px; font-size: 0.9em; }
-
         .resizer { background: transparent; transition: background 0.2s; z-index: 10; }
         .resizer:hover { background: rgba(0,122,255,0.3); }
         .resizer-vertical { width: 5px; cursor: col-resize; }
         .resizer-horizontal { height: 5px; cursor: row-resize; }
-
         .msg-actions { margin-top: 8px; display: flex; gap: 8px; }
         .regen-btn { background: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; padding: 4px 10px; font-size: 12px; color: #555; cursor: pointer; transition: all 0.2s; }
         .regen-btn:hover { background: rgba(255,255,255,0.35); color: #333; border-color: rgba(255,255,255,0.5); }
         .message.assistant .msg-actions { justify-content: flex-end; }
-
-        /* 删除按钮 */
         .message.user .msg-delete { background: none; border: none; cursor: pointer; font-size: 14px; color: rgba(255,255,255,0.5); padding: 2px 8px; margin-right: 4px; border-radius: 4px; order: -1; align-self: center; flex-shrink: 0; transition: color 0.2s, background 0.2s; }
         .message.user .msg-delete:hover { color: #ff4444; background: rgba(255,68,68,0.15); }
-
-        .code-copy-btn {
-            position: absolute; top: 8px; right: 8px;
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-            color: #abb2bf; padding: 4px 10px; border-radius: 6px;
-            font-size: 12px; cursor: pointer; opacity: 0; transition: opacity 0.2s;
-        }
+        .code-copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #abb2bf; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; opacity: 0; transition: opacity 0.2s; }
         pre:hover .code-copy-btn { opacity: 1; }
         .code-copy-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
         .code-copy-btn.copied { background: #51cf66; color: #fff; border-color: #51cf66; opacity: 1; }
@@ -184,7 +160,10 @@
 <div class="resizer resizer-vertical" id="resizer-left"></div>
 <div class="main-area" id="main-area">
     <div class="chat-background" id="chat-background"></div>
+    <button class="sidebar-toggle-btn toggle-left-btn" id="toggle-left-btn" title="收起/展开对话列表">☰</button>
+    <button class="sidebar-toggle-btn toggle-summary-btn" id="toggle-summary-btn" title="展开概括内容">📝</button>
     <div class="chat-area" id="chat-area"></div>
+    <div class="model-bar" id="model-bar" style="display:none;"></div>
     <div class="resizer resizer-horizontal" id="resizer-input"></div>
     <div class="input-container" id="input-container">
         <div class="input-row">
@@ -195,11 +174,20 @@
             <textarea id="user-input" placeholder="输入消息...（Enter 换行，Ctrl+Enter 发送）"></textarea>
             <button class="send-btn" id="send-btn">发送</button>
             <button class="settings-btn" id="settings-btn" title="设置">⚙️</button>
+            <button class="memory-btn" id="memory-btn" title="记忆概括">🧠</button>
         </div>
     </div>
 </div>
+<div class="sidebar-summary" id="sidebar-summary">
+    <div class="summary-header">
+        <span>🧠 记忆概括</span>
+        <button class="summary-close-btn" id="summary-close-btn" title="关闭">✕</button>
+    </div>
+    <div class="summary-content" id="summary-content">暂无概括内容</div>
+</div>
 <div class="resizer resizer-vertical" id="resizer-right" style="display:none;"></div>
 <div class="sidebar-right" id="sidebar-right">
+    <button class="collapse-btn" id="collapse-sidebar-btn" title="收起">✕</button>
     <div class="header">
         <span style="font-weight:600; font-size:14px;">📁 文件列表</span>
         <div>
@@ -207,13 +195,15 @@
             <button id="deselect-all-btn">清空</button>
         </div>
     </div>
+    <div class="path-selector" id="path-selector">
+        <select id="path-select"></select>
+        <button id="refresh-path-btn" title="刷新">🔄</button>
+        <button id="remove-path-btn" title="移除">✕</button>
+    </div>
     <div class="file-tree" id="file-tree"></div>
 </div>
 
 <script>
-    // ====================================================================
-    // 1. Markdown & KaTeX
-    // ====================================================================
     const blockMathExtension = {
         name: 'blockMath', level: 'block',
         start(src) { return src.indexOf('$$'); },
@@ -243,9 +233,6 @@
     marked.use({ extensions: [blockMathExtension, inlineMathExtension] });
     marked.setOptions({ breaks: true, gfm: true });
 
-    // ====================================================================
-    // 2. 全局变量 & 核心连接 (略，保持原样)
-    // ====================================================================
     var bridge = null, selectedFiles = new Set(), clickCount = 0, clickTimer = null, wallpaperDialogOpen = false;
     var sendDisabled = false, lastUserMessageElem = null, pendingInputText = '';
     var currentAssistantMsgDiv = null, currentThinkingBlock = null, currentAssistantBlock = null, currentRawText = "";
@@ -267,9 +254,6 @@
     }
     function isBridgeReady() { return !!bridge; }
 
-    // ====================================================================
-    // 5. 功能函数
-    // ====================================================================
     function updateConversationList(convs) {
         if (!bridge) return;
         var convList = document.getElementById('conv-list');
@@ -320,7 +304,6 @@
         document.querySelectorAll('#conv-list li').forEach(function(li) { li.classList.remove('active'); });
     }
 
-    // ----- 消息渲染 -----
     function addUserMessage(text, filesJson) {
         var chatArea = document.getElementById('chat-area');
         if (!chatArea) return;
@@ -330,13 +313,10 @@
         div.dataset.files = filesJson || "[]";
         var contentDiv = document.createElement('div');
         contentDiv.className = 'content';
-
         var p = document.createElement('p');
         p.textContent = text;
         p.style.marginBottom = '8px';
         contentDiv.appendChild(p);
-
-        // 新增：即时渲染文件折叠卡片
         if (filesJson) {
             try {
                 var files = JSON.parse(filesJson);
@@ -357,7 +337,6 @@
                 });
             } catch(e) {}
         }
-
         div.innerHTML = '<div class="avatar">👤</div>';
         var deleteBtn = document.createElement('button');
         deleteBtn.className = 'msg-delete';
@@ -394,14 +373,12 @@
         if (!assistantMsg) return;
         if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
         currentAssistantMsgDiv = null; currentThinkingBlock = null; currentAssistantBlock = null; currentRawText = "";
-        // 向前查找对应的用户消息
         var userMsg = assistantMsg.previousElementSibling;
         while (userMsg && !userMsg.classList.contains('message') || (userMsg && !userMsg.classList.contains('user'))) {
             userMsg = userMsg ? userMsg.previousElementSibling : null;
         }
         if (!userMsg) return;
         var text = userMsg.dataset.text, filesJson = userMsg.dataset.files;
-        // 只移除 AI 回复，保留用户消息
         assistantMsg.remove();
         sendDisabled = true;
         var sendBtn = document.getElementById('send-btn');
@@ -611,8 +588,23 @@
         currentAssistantMsgDiv = null; currentThinkingBlock = null; currentAssistantBlock = null; currentRawText = "";
     }
 
-    // ----- 文件树 & 其他功能 (保持原样) -----
     function displayFileTree(tree) { var c=document.getElementById('file-tree');if(!c)return;c.innerHTML='';selectedFiles.clear();var r=document.createElement('ul');buildTreeDOM(tree,r);c.appendChild(r);selectAllFiles();openRightPanel(); }
+    function clearFileTree() { var c=document.getElementById('file-tree');if(c)c.innerHTML=''; selectedFiles.clear(); var ps=document.getElementById('path-selector');if(ps)ps.style.display='none'; }
+    function updatePathList(paths, currentPath) {
+        var sel = document.getElementById('path-select');
+        var ps = document.getElementById('path-selector');
+        if (!sel || !ps) return;
+        sel.innerHTML = '';
+        paths.forEach(function(p) {
+            var opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p.split('\\').pop().split('/').pop();
+            opt.title = p;
+            if (p === currentPath) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        ps.style.display = paths.length > 0 ? 'flex' : 'none';
+    }
     function buildTreeDOM(n,p){var l=document.createElement('li'),d=document.createElement('div');d.className='node-content';var t=document.createElement('span');t.className='toggle-icon';t.innerHTML=n.type==='directory'?'▾':'';t.style.visibility=n.type==='directory'?'visible':'hidden';var c=document.createElement('input');c.type='checkbox';c.checked=true;var s=document.createElement('span');s.className='node-name';s.textContent=(n.type==='directory'?'📁 ':'📄 ')+n.name;d.appendChild(t);d.appendChild(c);d.appendChild(s);if(n.type==='file'){l.setAttribute('data-path',n.path);var k=document.createElement('span');k.className='token-info';k.textContent=(n.token_count||0)+' tk';d.appendChild(k);c.addEventListener('change',function(){if(this.checked)selectedFiles.add(n.path);else selectedFiles.delete(n.path);updateParentFolderCheckbox(l);});l.appendChild(d);p.appendChild(l);}else{var u=document.createElement('ul');l.appendChild(d);l.appendChild(u);if(n.children)n.children.forEach(function(h){buildTreeDOM(h,u);});var f=function(e){if(e&&e.target===c)return;u.classList.toggle('collapsed');t.classList.toggle('collapsed');};t.addEventListener('click',function(e){e.stopPropagation();f(e);});d.addEventListener('click',f);c.addEventListener('change',function(){var a=l.querySelectorAll('ul input[type="checkbox"]');a.forEach(function(b){b.checked=this.checked;var v=b.closest('[data-path]')?.getAttribute('data-path');if(v){if(this.checked)selectedFiles.add(v);else selectedFiles.delete(v);}});});p.appendChild(l);}}
     function updateParentFolderCheckbox(f){var p=f.parentElement?.closest('li');while(p&&p.querySelector('ul')){var c=p.querySelector(':scope > .node-content > input[type="checkbox"]');if(!c)break;var h=p.querySelectorAll('ul li[data-path] input[type="checkbox"]');if(h.length>0)c.checked=Array.from(h).every(function(b){return b.checked;});p=p.parentElement?.closest('li');}}
     function selectAllFiles(){document.querySelectorAll('#file-tree input[type="checkbox"]').forEach(function(c){c.checked=true;});rebuildSelectedFilesFromDOM();}
@@ -621,6 +613,37 @@
     function loadFolder(){var i=document.getElementById('folder-path');if(!i)return;var p=i.value.trim();if(p&&bridge)bridge.load_folder(p);}
     function openRightPanel(){var p=document.getElementById('sidebar-right'),r=document.getElementById('resizer-right');if(!p||!r)return;p.classList.add('open');r.style.display='block';if(p.offsetWidth===0)p.style.width='360px';}
     function closeRightPanel(){var p=document.getElementById('sidebar-right'),r=document.getElementById('resizer-right');if(p)p.classList.remove('open');if(r)r.style.display='none';if(p)p.style.width='0';selectedFiles.clear();}
+
+    function toggleLeftSidebar() {
+        var sb = document.getElementById('sidebar-left');
+        var rl = document.getElementById('resizer-left');
+        var btn = document.getElementById('toggle-left-btn');
+        if (!sb) return;
+        if (sb.classList.contains('collapsed')) {
+            sb.classList.remove('collapsed');
+            sb.style.width = '240px';
+            if (rl) rl.style.display = 'block';
+            if (btn) btn.textContent = '☰';
+        } else {
+            sb.classList.add('collapsed');
+            if (rl) rl.style.display = 'none';
+            if (btn) btn.textContent = '▶';
+        }
+    }
+    function openSummaryPanel() {
+        var panel = document.getElementById('sidebar-summary');
+        if (!panel) return;
+        panel.classList.add('open');
+        if (bridge && bridge.get_summary_content) {
+            var content = bridge.get_summary_content();
+            var el = document.getElementById('summary-content');
+            if (el) el.textContent = content || '暂无概括内容';
+        }
+    }
+    function closeSummaryPanel() {
+        var panel = document.getElementById('sidebar-summary');
+        if (panel) panel.classList.remove('open');
+    }
 
     function send() {
         var userInput = document.getElementById('user-input');
@@ -656,15 +679,31 @@
             }
         } catch(e) {}
     }
-
     function enableSendButton(){sendDisabled=false;var s=document.getElementById('send-btn');if(s)s.disabled=false;lastUserMessageElem=null;pendingInputText='';}
     function onWallpaperSettingsClosed(){wallpaperDialogOpen=false;}
     function setWallpaper(p,o){document.documentElement.style.setProperty('--wallpaper-path','url('+p+')');document.documentElement.style.setProperty('--wallpaper-opacity',o);}
 
+    function showModelTag(model) {
+        var bar = document.getElementById('model-bar');
+        if (!bar) return;
+        if (!model) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+        bar.style.display = 'flex';
+        bar.innerHTML = '<span class="model-bar-label">🤖 模型:</span> <span class="model-bar-name model-bar-clickable" id="model-bar-click" title="点击更改模型">' + model + ' ✎</span>';
+        document.getElementById('model-bar-click')?.addEventListener('click', function() {
+            if (bridge) bridge.open_model_dialog();
+        });
+    }
+    function showSummarizeStatus(text) {
+        var bar = document.getElementById('model-bar');
+        if (!bar) return;
+        var statusSpan = bar.querySelector('.summarize-status');
+        if (!statusSpan) { statusSpan = document.createElement('span'); statusSpan.className = 'summarize-status'; bar.appendChild(statusSpan); }
+        statusSpan.textContent = text || '';
+        if (!text) statusSpan.style.display = 'none';
+        else statusSpan.style.display = 'inline';
+    }
     function initResizers(){var l=document.getElementById('sidebar-left'),r=document.getElementById('sidebar-right'),rl=document.getElementById('resizer-left'),rr=document.getElementById('resizer-right'),ic=document.getElementById('input-container'),ri=document.getElementById('resizer-input');if(!l||!r||!rl||!rr||!ic||!ri)return;var sx,sw,sy,sh;rl.addEventListener('mousedown',function(e){sx=e.clientX;sw=l.offsetWidth;document.addEventListener('mousemove',mml);document.addEventListener('mouseup',mul);e.preventDefault();});function mml(e){l.style.width=Math.min(500,Math.max(150,sw+e.clientX-sx))+'px';}function mul(){document.removeEventListener('mousemove',mml);document.removeEventListener('mouseup',mul);}rr.addEventListener('mousedown',function(e){sx=e.clientX;sw=r.offsetWidth;document.addEventListener('mousemove',mmr);document.addEventListener('mouseup',mur);e.preventDefault();});function mmr(e){r.style.width=Math.min(600,Math.max(200,sw+sx-e.clientX))+'px';}function mur(){document.removeEventListener('mousemove',mmr);document.removeEventListener('mouseup',mur);}ri.addEventListener('mousedown',function(e){sy=e.clientY;sh=ic.offsetHeight;document.addEventListener('mousemove',mmi);document.addEventListener('mouseup',mui);e.preventDefault();});function mmi(e){var h=Math.min(window.innerHeight*0.6,Math.max(100,sh+sy-e.clientY));ic.style.height=h+'px';}function mui(){document.removeEventListener('mousemove',mmi);document.removeEventListener('mouseup',mui);}}
-
     function renderMarkdown(text) { return marked.parse(text); }
-
     function renderMarkdownFinal(text) {
         var html = marked.parse(text);
         var tmp = document.createElement('div');
@@ -672,24 +711,32 @@
         tmp.querySelectorAll('pre code').forEach(function(block) { hljs.highlightElement(block); });
         return tmp.innerHTML;
     }
-
-
     function initialize() {
         initResizers();
         document.getElementById('send-btn')?.addEventListener('click', send);
         document.getElementById('load-folder-btn')?.addEventListener('click', loadFolder);
         document.getElementById('settings-btn')?.addEventListener('click', function() { if (bridge) bridge.open_settings(); });
+        document.getElementById('memory-btn')?.addEventListener('click', function() { if (bridge) bridge.open_memory_settings(); });
         document.getElementById('new-conv-btn')?.addEventListener('click', newConversation);
         document.getElementById('select-all-btn')?.addEventListener('click', selectAllFiles);
         document.getElementById('deselect-all-btn')?.addEventListener('click', deselectAllFiles);
+        document.getElementById('collapse-sidebar-btn')?.addEventListener('click', closeRightPanel);
+        document.getElementById('toggle-left-btn')?.addEventListener('click', toggleLeftSidebar);
+        document.getElementById('toggle-summary-btn')?.addEventListener('click', openSummaryPanel);
+        document.getElementById('summary-close-btn')?.addEventListener('click', closeSummaryPanel);
+        document.getElementById('path-select')?.addEventListener('change', function() {
+            if (bridge && this.value) bridge.switch_path(this.value);
+        });
+        document.getElementById('refresh-path-btn')?.addEventListener('click', function() {
+            if (bridge) bridge.refresh_current_path();
+        });
+        document.getElementById('remove-path-btn')?.addEventListener('click', function() {
+            var sel = document.getElementById('path-select');
+            if (bridge && sel && sel.value) bridge.remove_path(sel.value);
+        });
         document.getElementById('folder-path')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); loadFolder(); } });
-
-        // 优化：Enter 直接换行，Ctrl/Cmd + Enter 发送
         document.getElementById('user-input')?.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                send();
-            }
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); }
         });
         attemptConnection();
     }

@@ -20,19 +20,50 @@ def parse_error(error_message: str) -> str:
         return "当前模型不支持上传图片或文件，请切换模型或移除附件。\n原始错误: " + error_message
     return error_message
 
+def _read_pdf(file_path: str) -> str:
+    try:
+        import fitz
+        doc = fitz.open(file_path)
+        text = "\n".join(page.get_text() for page in doc)
+        doc.close()
+        return text
+    except ImportError:
+        return f"[无法读取PDF: 缺少 PyMuPDF 依赖，请运行 pip install PyMuPDF]"
+    except Exception as e:
+        return f"[读取PDF失败: {os.path.basename(file_path)} - {e}]"
+
+def _read_docx(file_path: str) -> str:
+    try:
+        import docx
+        doc = docx.Document(file_path)
+        return "\n".join(p.text for p in doc.paragraphs)
+    except ImportError:
+        return f"[无法读取Word: 缺少 python-docx 依赖，请运行 pip install python-docx]"
+    except Exception as e:
+        return f"[读取Word失败: {os.path.basename(file_path)} - {e}]"
+
 def read_file_as_content(file_path: str) -> Optional[Dict]:
     try:
         file_size = os.path.getsize(file_path)
         if file_size > 10240 * 1024:
             return {"type": "text", "text": f"[文件过大 ({file_size//1024}KB)，已跳过读取: {os.path.basename(file_path)}]"}
         mime_type = _guess_mime(file_path)
-        with open(file_path, "rb") as f:
-            data = f.read()
+        ext = os.path.splitext(file_path)[1].lower()
         if mime_type and mime_type.startswith("image/"):
+            with open(file_path, "rb") as f:
+                data = f.read()
             b64 = base64.b64encode(data).decode("utf-8")
             data_url = f"data:{mime_type};base64,{b64}"
             return {"type": "image_url", "image_url": {"url": data_url}}
+        elif ext == ".pdf":
+            text = _read_pdf(file_path)
+            return {"type": "text", "text": text}
+        elif ext in (".docx", ".doc"):
+            text = _read_docx(file_path)
+            return {"type": "text", "text": text}
         else:
+            with open(file_path, "rb") as f:
+                data = f.read()
             text = data.decode("utf-8", errors="replace")
             return {"type": "text", "text": text}
     except Exception as e:
@@ -57,28 +88,16 @@ def build_message_list(
     upload_files: Optional[List[str]] = None,
     root_path: Optional[str] = None
 ) -> Tuple[List[Dict], List[Dict]]:
-    """
-    返回 (api_messages, ui_content) 元组
-    - api_messages: 发送给 API 的标准格式消息列表
-    - ui_content: 用于 UI 显示的内容列表（包含文件折叠信息）
-    """
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
-    
-    # 构建 API 内容
     api_content = [{"type": "text", "text": user_text}]
-    # 构建 UI 内容（用于保存和显示）
     ui_content = [{"type": "text", "text": user_text}]
-    
     if upload_files:
         for fpath in upload_files:
             if os.path.isfile(fpath):
                 file_block = read_file_as_content(fpath)
                 if file_block:
-                    # API 使用标准格式
                     api_content.append(file_block)
-                    
-                    # UI 使用增强格式
                     if file_block["type"] == "text":
                         ui_content.append({
                             "type": "file_content",
@@ -87,16 +106,13 @@ def build_message_list(
                             "text": file_block["text"]
                         })
                     else:
-                        # 图片直接使用
                         ui_content.append(file_block)
-            
             if root_path:
                 try:
                     rel = os.path.relpath(fpath, root_path)
                     api_content.append({"type": "text", "text": f"[文件位置: {rel}]"})
                 except ValueError:
                     pass
-    
     messages.append({"role": "user", "content": api_content})
     return messages, ui_content
 
@@ -108,7 +124,6 @@ def create_record_folder() -> str:
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
         return base_name
-
     i = 1
     while True:
         new_name = f"{base_name}.{i}"
@@ -155,5 +170,5 @@ def list_conversations() -> List[str]:
     _ensure_records_dir()
     items = os.listdir(RECORDS_DIR)
     folders = [d for d in items if os.path.isdir(os.path.join(RECORDS_DIR, d))]
-    folders.sort(key=lambda d: os.path.getmtime(os.path.join(RECORDS_DIR, d)), reverse=True)
+    folders.sort(key=lambda l: os.path.getmtime(os.path.join(RECORDS_DIR, l)), reverse=True)
     return folders
