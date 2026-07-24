@@ -6,3 +6,4 @@ Pygments
 zhipuai>=2.0
 PyMuPDF>=1.23
 python-docx>=1.0
+Pillow

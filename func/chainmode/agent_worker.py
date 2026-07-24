@@ -23,7 +23,7 @@ class AgentWorker(QObject):
 
     def __init__(self, client, model, platform, user_message,
                  selected_files, root_path="", thinking_level="high",
-                 history=None):
+                 history=None, max_tokens=65536):
         super().__init__()
         self.client = client
         self.model = model
@@ -33,6 +33,7 @@ class AgentWorker(QObject):
         self.root_path = root_path
         self.thinking_level = thinking_level
         self.history = history or []
+        self.max_tokens = max_tokens
 
     @Slot()
     def run(self):

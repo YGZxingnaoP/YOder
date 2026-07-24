@@ -1,9 +1,16 @@
 import json
 import os
+import sys
 from openai import OpenAI
 from typing import Callable, Dict, Any
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def _get_base_dir():
+    """兼容 PyInstaller 打包环境，返回 exe 所在真实目录"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+BASE_DIR = _get_base_dir()
 CONFIG_PATH = os.path.join(BASE_DIR, "config", "info.json")
 
 PLATFORM_MODELS = {

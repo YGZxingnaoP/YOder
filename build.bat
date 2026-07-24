@@ -95,6 +95,7 @@ if exist build.log del /q build.log
     --noconfirm ^
     --clean ^
     --onefile ^
+    --windowed ^
     --name "%APP_NAME%" ^
     --icon="%ICON_FILE%" ^
     --add-data "func/ui;func/ui" ^

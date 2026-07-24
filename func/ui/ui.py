@@ -4,14 +4,21 @@ import json
 import time
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QDialog, QVBoxLayout, QHBoxLayout,
-    QLabel, QSlider, QPushButton, QFileDialog, QLineEdit, QCheckBox
+    QLabel, QSlider, QPushButton, QFileDialog, QLineEdit, QCheckBox,
+    QFormLayout, QDialogButtonBox
 )
 from PySide6.QtCore import QUrl, QObject, Slot, Signal, Qt, QThread, QTimer
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def _get_base_dir():
+    """兼容 PyInstaller 打包环境，返回 exe 所在真实目录"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+BASE_DIR = _get_base_dir()
 sys.path.insert(0, BASE_DIR)
 
 from func.chatbot.port import ChatClient, summarize_chat
@@ -34,8 +41,74 @@ CONFIG_PATH = os.path.join(BASE_DIR, "config", "info.json")
 
 
 class WallpaperDialog(QDialog):
-    # ... 保持原样，此处省略以节省篇幅，实际使用时请保留完整类定义 ...
-    pass
+    """壁纸设置对话框"""
+    
+    def __init__(self, parent=None, config=None, is_bound=False):
+        super().__init__(parent)
+        self.setWindowTitle("壁纸设置")
+        self.resize(420, 240)
+        self.config = config or {}
+        self._is_bound = is_bound
+        self._init_ui()
+
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
+
+        # 绑定当前对话开关
+        self.bind_check = QCheckBox("仅对当前对话生效")
+        self.bind_check.setChecked(self._is_bound)
+        layout.addWidget(self.bind_check)
+
+        form = QFormLayout()
+
+        # 壁纸路径
+        wp_cfg = self.config.get("wallpaper", {})
+        self.path_edit = QLineEdit(wp_cfg.get("path", ""))
+        self.path_edit.setReadOnly(True)
+        browse_btn = QPushButton("浏览...")
+        browse_btn.clicked.connect(self._browse_image)
+
+        path_layout = QHBoxLayout()
+        path_layout.addWidget(self.path_edit)
+        path_layout.addWidget(browse_btn)
+
+        # 透明度
+        self.opacity_slider = QSlider(Qt.Horizontal)
+        self.opacity_slider.setRange(0, 100)
+        self.opacity_slider.setValue(int(wp_cfg.get("opacity", 0.2) * 100))
+
+        self.opacity_label = QLabel(f"{self.opacity_slider.value()}%")
+        self.opacity_slider.valueChanged.connect(
+            lambda v: self.opacity_label.setText(f"{v}%")
+        )
+
+        form.addRow("壁纸图片:", path_layout)
+        form.addRow("透明度:", self.opacity_slider)
+        form.addRow("", self.opacity_label)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _browse_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择壁纸图片", "",
+            "图片文件 (*.png *.jpg *.jpeg *.bmp *.gif)"
+        )
+        if file_path:
+            self.path_edit.setText(file_path)
+
+    def is_conversation_bound(self):
+        return self.bind_check.isChecked()
+
+    def get_values(self):
+        return {
+            "path": self.path_edit.text(),
+            "opacity": self.opacity_slider.value() / 100.0
+        }
 
 
 class StreamWorker(QObject):
@@ -569,6 +642,7 @@ class Bridge(QObject):
                 agent_history = agent_history[:-2]  # 排除当前 user + assistant 占位
 
             # 创建 AgentWorker
+            max_tokens = self.client.config.get("max_tokens", 65536)
             self.worker = AgentWorker(
                 client=agent_client,
                 model=model,
@@ -577,7 +651,8 @@ class Bridge(QObject):
                 selected_files=files,
                 root_path=self.current_path,
                 thinking_level=self.client.thinking_level,
-                history=agent_history
+                history=agent_history,
+                max_tokens=max_tokens
             )
             self.worker_thread = QThread()
             self.worker.moveToThread(self.worker_thread)

@@ -15,8 +15,8 @@ from .agent_prompts import (
     SUMMARY_SYSTEM, SUMMARY_USER,
 )
 
-# Agent 模式使用尽可能宽松的最大 token
-AGENT_MAX_TOKENS = 65536
+# Agent 模式默认最大 token（由调用方传入）
+DEFAULT_AGENT_MAX_TOKENS = 65536
 
 
 def _read_file_safe(file_path: str, max_chars: int = 15000) -> str:
@@ -61,7 +61,8 @@ def _call_api(client: OpenAI, model: str, messages: list,
               callback: Optional[Callable] = None,
               thinking_callback: Optional[Callable] = None,
               stream: bool = True,
-              extra_body: dict = None) -> str:
+              extra_body: dict = None,
+              max_tokens: int = DEFAULT_AGENT_MAX_TOKENS) -> str:
     """
     调用 AI API，支持流式和非流式。
     callback(type, content) 用于最终内容的流式输出。
@@ -71,7 +72,7 @@ def _call_api(client: OpenAI, model: str, messages: list,
     if not stream or callback is None:
         completion = client.chat.completions.create(
             model=model, messages=messages,
-            max_tokens=AGENT_MAX_TOKENS,
+            max_tokens=max_tokens,
             stream=True,  # 总是用流式以获取思考内容
             extra_body=extra_body if extra_body else None
         )
@@ -91,7 +92,7 @@ def _call_api(client: OpenAI, model: str, messages: list,
     full_text = ""
     completion = client.chat.completions.create(
         model=model, messages=messages,
-        max_tokens=AGENT_MAX_TOKENS,
+        max_tokens=max_tokens,
         stream=True,
         extra_body=extra_body if extra_body else None
     )
@@ -117,7 +118,7 @@ def _get_extra_body(platform: str, thinking_level: str = "high") -> dict:
     return {}
 
 
-def _build_history_text(history: List[Dict], max_chars: int = 6000) -> str:
+def _build_history_text(history: List[Dict], max_chars: int = 12000) -> str:
     """将对话历史格式化为可读文本，用于注入阶段3提示词"""
     if not history:
         return ""
@@ -125,10 +126,40 @@ def _build_history_text(history: List[Dict], max_chars: int = 6000) -> str:
     for msg in history:
         role = msg.get("role", "")
         content = msg.get("content", "")
-        if role == "system":
-            continue  # 跳过概括系统消息
+        # 保留系统消息（含记忆概括）
         if isinstance(content, list):
             # 多块内容（用户消息含文件）：取第一个文本块
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text = block["text"]
+                    break
+            else:
+                text = ""
+        else:
+            text = str(content) if content else ""
+        if not text.strip():
+            continue
+        label = "用户" if role == "user" else "助手"
+        if len(text) > 3000:
+            text = text[:3000] + "..."
+        parts.append(f"{label}: {text}")
+    result = "\n\n".join(parts)
+    if len(result) > max_chars:
+        result = result[-max_chars:]
+    return result
+
+
+def _build_phase12_history_text(history: List[Dict], max_chars: int = 3000) -> str:
+    """为阶1/2构建简要历史（最近2轮），节省token"""
+    if not history:
+        return ""
+    # 只取最近2轮（4条消息）
+    recent = history[-4:]
+    parts = []
+    for msg in recent:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if isinstance(content, list):
             for block in content:
                 if isinstance(block, dict) and block.get("type") == "text":
                     text = block["text"]
@@ -161,6 +192,7 @@ def run_agent_pipeline(
     stream_callback: Callable = None,
     thinking_callback: Callable = None,
     history: List[Dict] = None,
+    max_tokens: int = 65536,
 ):
     """
     执行完整的 Agent 流程:
@@ -171,14 +203,14 @@ def run_agent_pipeline(
     progress_callback(status_str, tasklist_list) - 更新进度
     stream_callback(type, content) - 流式输出最终总结
     thinking_callback(content) - 流式输出规划和分析阶段的思考过程
-    history - 对话历史（API 格式），注入阶段3以支持多轮记忆
+    history - 对话历史（API 格式），注入阶1/2/3以支持多轮记忆
     """
     extra_body = _get_extra_body(platform, thinking_level)
-
+    
     def _update_progress(status, tasks):
         if progress_callback:
             progress_callback(status, tasks)
-
+    
     # ── 构建文件列表描述 ──
     file_list_text = ""
     file_map = {}
@@ -188,19 +220,29 @@ def run_agent_pipeline(
         file_list_text += f"- {relpath}\n"
         file_map[basename] = fpath
         file_map[relpath] = fpath
-
+    
     if not file_list_text:
         file_list_text = "(未选择文件)"
-
-    # ═══ 阶段 1: 规划 ═══
-    _update_progress("📋 阶段 1/3: 分析目标，制定任务计划...", [])
-
+    
+    # ── 构建阶1/2简要历史 ──
+    phase12_history = _build_phase12_history_text(history or [])
+    
+    # ═══ 阶 1: 规划 ═══
+    _update_progress("📋 阶 1/3: 分析目标，制定任务计划...", [])
+    
+    phase1_user_content = PLANNING_USER.format(
+        user_message=user_message,
+        file_list=file_list_text
+    )
+    if phase12_history:
+        phase1_user_content = (
+            f"【对话历史】\n{phase12_history}\n\n"
+            f"{phase1_user_content}"
+        )
+    
     plan_messages = [
         {"role": "system", "content": PLANNING_SYSTEM},
-        {"role": "user", "content": PLANNING_USER.format(
-            user_message=user_message,
-            file_list=file_list_text
-        )}
+        {"role": "user", "content": phase1_user_content}
     ]
 
     # 包装回调：将模型所有输出（reasoning_content + content）都路由到思考块
@@ -218,13 +260,15 @@ def run_agent_pipeline(
             thinking_callback(text)
 
     # 规划阶段：阶段标记→内容块（可见），模型输出→思考块（折叠）
+    phase12_max_tokens = max_tokens // 2  # 阶1/2使用配置的一半
     if stream_callback:
         stream_callback("content", "\n📋 【规划阶段】\n")
     plan_text = _call_api(
         client, model, plan_messages,
         callback=_all_to_thinking,  # content也路由到思考块
         thinking_callback=_all_to_thinking,  # reasoning_content也路由到思考块
-        extra_body=None
+        extra_body=None,
+        max_tokens=phase12_max_tokens
     )
     plan = _extract_json(plan_text)
 
@@ -232,20 +276,29 @@ def run_agent_pipeline(
         _update_progress("⚠️ 规划失败，切换为普通分析模式...", [])
         if stream_callback:
             stream_callback("content", "\n⚠️ 规划解析失败，切换为普通分析模式\n")
+        
+        fallback_user_content = ANALYSIS_USER.format(
+            user_message=user_message,
+            task_id=1,
+            task_description=f"综合分析用户问题: {user_message}",
+            file_contents=file_list_text,
+            previous_results="(无前置分析)"
+        )
+        if phase12_history:
+            fallback_user_content = (
+                f"【对话历史】\n{phase12_history}\n\n"
+                f"{fallback_user_content}"
+            )
+        
         fallback_messages = [
             {"role": "system", "content": ANALYSIS_SYSTEM},
-            {"role": "user", "content": ANALYSIS_USER.format(
-                user_message=user_message,
-                task_id=1,
-                task_description=f"综合分析用户问题: {user_message}",
-                file_contents=file_list_text,
-                previous_results="(无前置分析)"
-            )}
+            {"role": "user", "content": fallback_user_content}
         ]
         result = _call_api(client, model, fallback_messages,
                           callback=_all_to_thinking,
                           thinking_callback=_all_to_thinking,
-                          extra_body=None)
+                          extra_body=None,
+                          max_tokens=phase12_max_tokens)
         _update_progress("", [])
         return result
 
@@ -298,16 +351,23 @@ def run_agent_pipeline(
             for tr in task_results:
                 previous_results_text += f"\n### 任务 {tr['task_id']}: {tr['description']}\n{tr['result'][:3000]}\n"
 
-        # 调用 AI 分析（包含用户问题上下文 + 前序任务结果）
+        # 调用 AI 分析（包含用户问题上下文 + 前序任务结果 + 对话历史）
+        analysis_user_content = ANALYSIS_USER.format(
+            user_message=user_message,
+            task_id=task_id,
+            task_description=task_desc,
+            file_contents=file_contents,
+            previous_results=previous_results_text
+        )
+        if phase12_history:
+            analysis_user_content = (
+                f"【对话历史】\n{phase12_history}\n\n"
+                f"{analysis_user_content}"
+            )
+        
         analysis_messages = [
             {"role": "system", "content": ANALYSIS_SYSTEM},
-            {"role": "user", "content": ANALYSIS_USER.format(
-                user_message=user_message,
-                task_id=task_id,
-                task_description=task_desc,
-                file_contents=file_contents,
-                previous_results=previous_results_text
-            )}
+            {"role": "user", "content": analysis_user_content}
         ]
 
         if stream_callback:
@@ -317,7 +377,8 @@ def run_agent_pipeline(
             client, model, analysis_messages,
             callback=_all_to_thinking,  # content也路由到思考块
             thinking_callback=_all_to_thinking,  # reasoning_content也路由到思考块
-            extra_body=None
+            extra_body=None,
+            max_tokens=phase12_max_tokens
         )
 
         if stream_callback:
@@ -364,7 +425,8 @@ def run_agent_pipeline(
         client, model, summary_messages,
         callback=stream_callback,
         thinking_callback=None,
-        extra_body=extra_body
+        extra_body=extra_body,
+        max_tokens=max_tokens  # 阶3使用完整 max_tokens
     )
 
     _update_progress("", [])
