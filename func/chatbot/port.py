@@ -10,12 +10,14 @@ PLATFORM_MODELS = {
     "阿里": ["qwen-max", "qwen-plus", "qwen-turbo", "qwen3-max", "qwen3.7-max", "qwen3.7-plus"],
     "DeepSeek": ["deepseek-chat", "deepseek-reasoner"],
     "智谱": ["glm-4-plus", "glm-4-long", "glm-4-flash", "glm-5.2"],
+    "Kimi": ["kimi-k3", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
 }
 
 PLATFORM_BASE_URLS = {
     "阿里": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "DeepSeek": "https://api.deepseek.com",
     "智谱": "https://open.bigmodel.cn/api/paas/v4/",
+    "Kimi": "https://api.moonshot.cn/v1",
 }
 
 def summarize_chat(messages: list, config: dict) -> str:
@@ -56,7 +58,7 @@ class ChatClient:
         if not os.path.exists(path):
             os.makedirs(os.path.dirname(path), exist_ok=True)
             default_config = {
-                "api_keys": {"阿里": "", "DeepSeek": "", "智谱": ""},
+                "api_keys": {"阿里": "", "DeepSeek": "", "智谱": "", "Kimi": ""},
                 "platform": "阿里",
                 "model": "qwen-max",
                 "memory_rounds": 50,

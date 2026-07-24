@@ -38,7 +38,7 @@ body {
     overflow: hidden; z-index: 2;
     transition: width 0.25s ease;
 }
-.sidebar-left.collapsed { width: 0; border-right: none; }
+.sidebar-left.collapsed { width: 0 !important; border-right: none; }
 .sidebar-left.collapsed > * { display: none; }
 .sidebar-left h3 { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.25); margin: 0; font-size: 14px; color: #444; text-shadow: 0 1px 2px rgba(255,255,255,0.5); }
 #conv-list { flex: 1; overflow-y: auto; list-style: none; padding: 8px; margin: 0; }
@@ -67,7 +67,8 @@ body {
 .message.assistant .avatar { margin-right: 12px; }
 
 .avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.8); color: #555; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(255,255,255,0.3); }
-.model-tag { font-size: 11px; color: #666; margin-left: 8px; background: rgba(255,255,255,0.6); padding: 2px 6px; border-radius: 4px; }
+.model-tag { font-size: 11px; color: #888; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 4px; display: block; margin-bottom: 8px; }
+.model-tag:empty { display: none; }
 
 /* 对话气泡 */
 .content {
@@ -79,6 +80,7 @@ body {
     box-shadow: 0 2px 12px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.35);
     line-height: 1.9;
     font-size: 14.5px;
+    position: relative;
 }
 .user .content { background: rgba(0,122,255,0.92); color: white; line-height: 1.8; box-shadow: 0 2px 12px rgba(0,122,255,0.2), inset 0 0 0 1px rgba(255,255,255,0.15); }
 .user .avatar { background: rgba(200,225,255,0.8); color: var(--accent-color); }
@@ -90,6 +92,7 @@ body {
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 13.5px;
     line-height: 1.6;
+    word-break: break-word;
 }
 
 /* ==================== 思考过程 ==================== */
@@ -98,7 +101,7 @@ body {
 details.thinking-details summary { list-style: none; cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; color: #666; display: flex; align-items: center; }
 details.thinking-details summary::before { content: '\25B8'; margin-right: 6px; transition: transform 0.2s; display: inline-block; }
 details.thinking-details[open] summary::before { transform: rotate(90deg); }
-.thinking-content { margin-top: 8px; padding: 12px; background: rgba(0,0,0,0.04); border-left: 3px solid rgba(0,0,0,0.12); border-radius: 4px; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #555; font-family: 'Consolas','Monaco',monospace; max-height: 300px; overflow-y: auto; }
+.thinking-content { margin-top: 8px; padding: 12px; background: rgba(0,0,0,0.04); border-left: 3px solid rgba(0,0,0,0.12); border-radius: 4px; white-space: normal; word-break: break-word; font-size: 13.5px; color: #555; max-height: 400px; overflow-y: auto; line-height: 1.7; }
 
 /* ==================== 文件卡片 ==================== */
 .file-card { margin: 10px 0; background: rgba(255,255,255,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.35); }
@@ -212,11 +215,73 @@ details.thinking-details[open] summary::before { transform: rotate(90deg); }
 .content.rendered p:last-child { margin-bottom: 0; }
 
 .assistant-output { margin-top: 0; }
+.thinking-block + .assistant-text-block { margin-top: 12px; }
 .thinking-block + .assistant-text { margin-top: 12px; }
 
 pre { background: #282c34; color: #abb2bf; border-radius: 10px; padding: 16px; overflow-x: auto; margin: 12px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
 pre code { background: transparent !important; padding: 0 !important; font-family: 'Fira Code','Consolas',monospace; font-size: 13px; }
 code { background: rgba(0,0,0,0.06); padding: 2px 4px; border-radius: 4px; font-size: 0.9em; }
+
+/* ==================== 对话配置面板 ==================== */
+.conv-config-panel {
+    background: rgba(255,255,255,0.7); border-bottom: 1px solid var(--glass-border);
+    z-index: 2; flex-shrink: 0;
+}
+.config-panel-header {
+    padding: 8px 16px; display: flex; justify-content: space-between; align-items: center;
+    background: rgba(255,255,255,0.3); border-bottom: 1px solid rgba(255,255,255,0.2);
+    font-size: 13px; font-weight: 600; color: #444;
+}
+.config-collapse-btn {
+    background: none; border: none; cursor: pointer; font-size: 14px; color: #666; padding: 2px 6px; border-radius: 4px;
+}
+.config-collapse-btn:hover { background: rgba(0,0,0,0.05); }
+.config-panel-body { padding: 10px 16px; }
+.config-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.config-row:last-child { margin-bottom: 0; }
+.config-toggle {
+    display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #444;
+    padding: 4px 8px; border-radius: 6px; transition: background 0.15s;
+}
+.config-toggle:hover { background: rgba(0,0,0,0.04); }
+.config-toggle input[type="checkbox"] { accent-color: var(--accent-color); }
+.config-detail { padding: 8px 0 0 0; }
+.config-detail label { font-size: 12px; color: #666; white-space: nowrap; }
+.config-detail select, .config-detail input[type="text"], .config-detail input[type="number"] {
+    padding: 4px 8px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px;
+    background: rgba(255,255,255,0.7); font-size: 12px; outline: none;
+}
+.config-detail select { min-width: 80px; }
+.config-detail input[type="text"] { width: 120px; }
+.config-detail input[type="number"] { width: 80px; }
+
+/* ==================== 思维链进度 ==================== */
+.chain-progress {
+    background: rgba(240,245,255,0.8); border-bottom: 1px solid rgba(0,122,255,0.15);
+    padding: 8px 16px; z-index: 2; flex-shrink: 0; max-height: 160px; overflow-y: auto;
+}
+.chain-status {
+    font-size: 12px; color: var(--accent-color); font-weight: 600; margin-bottom: 6px;
+}
+.chain-tasklist { font-size: 12px; color: #555; }
+.chain-task-item {
+    padding: 3px 0; display: flex; align-items: center; gap: 6px;
+}
+.chain-task-item .task-icon { width: 16px; text-align: center; flex-shrink: 0; }
+.chain-task-item.task-done { color: #2e7d32; }
+.chain-task-item.task-active { color: var(--accent-color); font-weight: 600; }
+.chain-task-item.task-pending { color: #999; }
+
+/* ==================== 思维链按钮 ==================== */
+.chain-btn {
+    position: absolute; bottom: 12px; left: 76px;
+    background: none; border: none; font-size: 18px; cursor: pointer;
+    opacity: 0.4; transition: opacity 0.2s; z-index: 10;
+}
+.chain-btn:hover { opacity: 0.8; }
+.chain-btn.active { opacity: 1; color: var(--accent-color); }
 
 /* ==================== 拖拽分隔条 ==================== */
 .resizer { background: transparent; transition: background 0.2s; z-index: 10; }
@@ -225,14 +290,22 @@ code { background: rgba(0,0,0,0.06); padding: 2px 4px; border-radius: 4px; font-
 .resizer-horizontal { height: 5px; cursor: row-resize; }
 
 /* ==================== 操作按钮 ==================== */
-.msg-actions { margin-top: 8px; display: flex; gap: 8px; }
-.regen-btn { background: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.3); border-radius: 12px; padding: 4px 10px; font-size: 12px; color: #555; cursor: pointer; transition: all 0.2s; }
-.regen-btn:hover { background: rgba(255,255,255,0.35); color: #333; border-color: rgba(255,255,255,0.5); }
-.message.assistant .msg-actions { justify-content: flex-end; }
+.msg-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; z-index: 2; }
+.message.assistant .content:hover .msg-actions { opacity: 1; }
+.regen-btn { background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.4); border-radius: 10px; padding: 3px 8px; font-size: 11px; color: #555; cursor: pointer; transition: all 0.2s; }
+.regen-btn:hover { background: rgba(255,255,255,0.8); color: #333; }
 
-/* 删除按钮 */
-.message.user .msg-delete { background: none; border: none; cursor: pointer; font-size: 14px; color: rgba(255,255,255,0.5); padding: 2px 8px; margin-right: 4px; border-radius: 4px; order: -1; align-self: center; flex-shrink: 0; transition: color 0.2s, background 0.2s; }
-.message.user .msg-delete:hover { color: #ff4444; background: rgba(255,68,68,0.15); }
+/* 删除按钮 —— 定位在用户气泡内部左下角 */
+.msg-delete {
+    position: absolute; bottom: 6px; left: 8px;
+    background: none; border: none; cursor: pointer;
+    font-size: 13px; color: rgba(255,255,255,0.35);
+    padding: 2px 6px; border-radius: 4px;
+    opacity: 0; transition: opacity 0.15s, color 0.15s, background 0.15s;
+    z-index: 2;
+}
+.message.user .content:hover .msg-delete { opacity: 1; }
+.msg-delete:hover { color: #ff4444 !important; background: rgba(255,68,68,0.2) !important; }
 
 /* ==================== 代码复制按钮 ==================== */
 .code-copy-btn {

@@ -91,6 +91,26 @@ def save_wallpaper_config(folder_name: str, config: Dict):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
+def load_agent_config(folder_name: str) -> Dict:
+    """加载对话的 Agent 模式配置"""
+    path = os.path.join(_conv_dir(folder_name), "agent.json")
+    if not os.path.exists(path):
+        return {"chain_mode": False}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"chain_mode": False}
+
+
+def save_agent_config(folder_name: str, config: Dict):
+    """保存对话的 Agent 模式配置"""
+    d = _conv_dir(folder_name)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "agent.json"), "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
 # ═══════════════════════════════════════════════════
 #  内部工具
 # ═══════════════════════════════════════════════════

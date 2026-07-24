@@ -1,7 +1,35 @@
+# 编辑器与 IDE 配置
 .vs/
 .idea/
+*.swp
+*.swo
+*~
+
+# Python 虚拟环境
 env/
+venv/
+.venv/
+
+# 运行时数据与用户配置 (不提交到版本库)
 wallpaper/
 records/
 config/info.json
+*.log
+
+# Python 编译与缓存
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+
+# PyInstaller 打包产物
+build/
+dist/
+*.spec
+
+# 操作系统生成文件
+.DS_Store
+Thumbs.db
+desktop.ini

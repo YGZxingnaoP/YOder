@@ -138,8 +138,11 @@ def save_conversation(folder_name: str, messages: List[Dict]):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
     file_path = os.path.join(folder_path, "chat.json")
-    with open(file_path, "w", encoding="utf-8") as f:
+    tmp_path = file_path + ".tmp"
+    # 先写入临时文件，再原子替换，防止读取到写了一半的损坏文件
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(messages, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, file_path)
 
 def load_conversation(folder_name: str) -> List[Dict]:
     file_path = os.path.join(RECORDS_DIR, folder_name, "chat.json")

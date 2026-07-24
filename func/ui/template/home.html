@@ -10,59 +10,96 @@
     <link rel="stylesheet" href="../lib/katex.min.css" />
     <script src="../lib/katex.min.js"></script>
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-    <link rel="stylesheet" href="style.css?v=6" />
+    <link rel="stylesheet" href="style.css?v=14" />
 </head>
 <body>
-<div class="sidebar-left" id="sidebar-left">
-    <h3>💬 对话列表</h3>
-    <ul id="conv-list"></ul>
-    <button id="new-conv-btn">+ 新建对话</button>
-</div>
-<div class="resizer resizer-vertical" id="resizer-left"></div>
-<div class="main-area" id="main-area">
-    <div class="chat-background" id="chat-background"></div>
-    <button class="sidebar-toggle-btn toggle-left-btn" id="toggle-left-btn" title="收起/展开对话列表">☰</button>
-    <button class="sidebar-toggle-btn toggle-summary-btn" id="toggle-summary-btn" title="展开概括内容">📝</button>
-    <div class="chat-area" id="chat-area"></div>
-    <div class="model-bar" id="model-bar" style="display:none;"></div>
-    <div class="resizer resizer-horizontal" id="resizer-input"></div>
-    <div class="input-container" id="input-container">
-        <div class="input-row">
-            <input type="text" id="folder-path" placeholder="输入文件夹路径（回车加载）" />
-            <button class="load-btn" id="load-folder-btn">加载</button>
+    <div class="sidebar-left" id="sidebar-left">
+        <h3>💬 对话列表</h3>
+        <ul id="conv-list"></ul>
+        <button id="new-conv-btn">+ 新建对话</button>
+    </div>
+    <div class="resizer resizer-vertical" id="resizer-left"></div>
+    <div class="main-area" id="main-area">
+        <div class="chat-background" id="chat-background"></div>
+        <button class="sidebar-toggle-btn toggle-left-btn" id="toggle-left-btn" title="收起/展开对话列表">☰</button>
+        <button class="sidebar-toggle-btn toggle-summary-btn" id="toggle-summary-btn" title="展开概括内容">📝</button>
+        <div class="conv-config-panel" id="conv-config-panel" style="display:none;">
+            <div class="config-panel-header">
+                <span>⚙️ 对话配置</span>
+                <button class="config-collapse-btn" id="config-collapse-btn" title="收起">▴</button>
+            </div>
+            <div class="config-panel-body">
+                <div class="config-row">
+                    <label class="config-toggle">
+                        <input type="checkbox" id="cfg-independent-model" />
+                        <span>使用独立模型配置</span>
+                    </label>
+                    <label class="config-toggle">
+                        <input type="checkbox" id="cfg-chain-mode" />
+                        <span>🧩 思维链模式</span>
+                    </label>
+                </div>
+                <div class="config-detail" id="config-model-detail" style="display:none;">
+                    <div class="config-row">
+                        <label>平台:</label>
+                        <select id="cfg-platform"></select>
+                        <label>模型:</label>
+                        <input type="text" id="cfg-model" placeholder="模型名称" />
+                    </div>
+                    <div class="config-row">
+                        <label>记忆轮数:</label>
+                        <input type="number" id="cfg-memory-rounds" value="50" min="1" max="1000" />
+                        <label>Max Tokens:</label>
+                        <input type="number" id="cfg-max-tokens" value="65536" min="1" max="2000000" />
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="input-row">
-            <textarea id="user-input" placeholder="输入消息...（Enter 换行，Ctrl+Enter 发送）"></textarea>
-            <button class="send-btn" id="send-btn">发送</button>
-            <button class="settings-btn" id="settings-btn" title="设置">⚙️</button>
-            <button class="memory-btn" id="memory-btn" title="记忆概括">🧠</button>
+        <div class="chain-progress" id="chain-progress" style="display:none;">
+            <div class="chain-status" id="chain-status">准备中...</div>
+            <div class="chain-tasklist" id="chain-tasklist"></div>
+        </div>
+        <div class="chat-area" id="chat-area"></div>
+        <div class="model-bar" id="model-bar" style="display:none;"></div>
+        <div class="resizer resizer-horizontal" id="resizer-input"></div>
+        <div class="input-container" id="input-container">
+            <div class="input-row">
+                <input type="text" id="folder-path" placeholder="输入文件夹路径（回车加载）" />
+                <button class="load-btn" id="load-folder-btn">加载</button>
+            </div>
+            <div class="input-row">
+                <textarea id="user-input" placeholder="输入消息...（Enter 换行，Ctrl+Enter 发送）"></textarea>
+                <button class="send-btn" id="send-btn">发送</button>
+                <button class="settings-btn" id="settings-btn" title="设置">⚙️</button>
+                <button class="memory-btn" id="memory-btn" title="记忆概括">🧠</button>
+                <button class="chain-btn" id="chain-btn" title="思维链模式">🧩</button>
+            </div>
         </div>
     </div>
-</div>
-<div class="sidebar-summary" id="sidebar-summary">
-    <div class="summary-header">
-        <span>🧠 记忆概括</span>
-        <button class="summary-close-btn" id="summary-close-btn" title="关闭">✕</button>
-    </div>
-    <div class="summary-content" id="summary-content">暂无概括内容</div>
-</div>
-<div class="resizer resizer-vertical" id="resizer-right" style="display:none;"></div>
-<div class="sidebar-right" id="sidebar-right">
-    <button class="collapse-btn" id="collapse-sidebar-btn" title="收起">✕</button>
-    <div class="header">
-        <span style="font-weight:600; font-size:14px;">📁 文件列表</span>
-        <div>
-            <button id="select-all-btn">全选</button>
-            <button id="deselect-all-btn">清空</button>
+    <div class="sidebar-summary" id="sidebar-summary">
+        <div class="summary-header">
+            <span>🧠 记忆概括</span>
+            <button class="summary-close-btn" id="summary-close-btn" title="关闭">✕</button>
         </div>
+        <div class="summary-content" id="summary-content">暂无概括内容</div>
     </div>
-    <div class="path-selector" id="path-selector">
-        <select id="path-select"></select>
-        <button id="refresh-path-btn" title="刷新">🔄</button>
-        <button id="remove-path-btn" title="移除">✕</button>
+    <div class="resizer resizer-vertical" id="resizer-right" style="display:none;"></div>
+    <div class="sidebar-right" id="sidebar-right">
+        <button class="collapse-btn" id="collapse-sidebar-btn" title="收起">✕</button>
+        <div class="header">
+            <span style="font-weight:600; font-size:14px;">📁 文件列表</span>
+            <div>
+                <button id="select-all-btn">全选</button>
+                <button id="deselect-all-btn">清空</button>
+            </div>
+        </div>
+        <div class="path-selector" id="path-selector">
+            <select id="path-select"></select>
+            <button id="refresh-path-btn" title="刷新">🔄</button>
+            <button id="remove-path-btn" title="移除">✕</button>
+        </div>
+        <div class="file-tree" id="file-tree"></div>
     </div>
-    <div class="file-tree" id="file-tree"></div>
-</div>
-<script src="script.js?v=6"></script>
+    <script src="script.js?v=16"></script>
 </body>
 </html>
