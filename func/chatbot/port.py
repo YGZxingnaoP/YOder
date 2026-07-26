@@ -13,12 +13,7 @@ def _get_base_dir():
 BASE_DIR = _get_base_dir()
 CONFIG_PATH = os.path.join(BASE_DIR, "config", "info.json")
 
-PLATFORM_MODELS = {
-    "阿里": ["qwen-max", "qwen-plus", "qwen-turbo", "qwen3-max", "qwen3.7-max", "qwen3.7-plus"],
-    "DeepSeek": ["deepseek-chat", "deepseek-reasoner"],
-    "智谱": ["glm-4-plus", "glm-4-long", "glm-4-flash", "glm-5.2"],
-    "Kimi": ["kimi-k3", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
-}
+PLATFORMS = ["阿里", "DeepSeek", "智谱", "Kimi"]
 
 PLATFORM_BASE_URLS = {
     "阿里": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -30,12 +25,13 @@ PLATFORM_BASE_URLS = {
 def summarize_chat(messages: list, config: dict) -> str:
     """
     非流式 chat 调用, 用于后台记忆概括。
-    config 需包含: api_keys, platform, model, max_tokens
+    config 需包含: api_keys, platform, model, max_tokens, temperature
     """
     keys = config.get("api_keys", {})
     platform = config.get("platform", "阿里")
     model = config.get("model", "qwen-max")
     max_tokens = config.get("max_tokens", 65536)
+    temperature = config.get("temperature", 0.7)
     base_url = PLATFORM_BASE_URLS.get(platform, "")
     key = keys.get(platform, "")
     if not key or not base_url:
@@ -45,6 +41,7 @@ def summarize_chat(messages: list, config: dict) -> str:
         model=model,
         messages=messages,
         max_tokens=max_tokens,
+        temperature=temperature,
         stream=False
     )
     if completion.choices and completion.choices[0].message.content:
@@ -58,6 +55,7 @@ class ChatClient:
         self.platform = self.config.get("platform", "阿里")
         self.model = self.config.get("model", "qwen-max")
         self.max_tokens = self.config.get("max_tokens", 65536)
+        self.temperature = self.config.get("temperature", 0.7)
         self.thinking_level = self.config.get("thinking_level", "high")
         self._init_clients()
 
@@ -71,6 +69,7 @@ class ChatClient:
                 "memory_rounds": 50,
                 "thinking_level": "high",
                 "max_tokens": 65536,
+                "temperature": 0.7,
                 "wallpaper": {"path": "", "opacity": 0.2}
             }
             with open(path, "w", encoding="utf-8") as f:
@@ -92,10 +91,11 @@ class ChatClient:
         self.platform = self.config.get("platform", "阿里")
         self.model = self.config.get("model", "qwen-max")
         self.max_tokens = self.config.get("max_tokens", 65536)
+        self.temperature = self.config.get("temperature", 0.7)
         self.thinking_level = self.config.get("thinking_level", "high")
         self._init_clients()
 
-    def chat(self, messages, callback, stream=True):
+    def chat(self, messages, callback, stream=True, temperature=None, max_tokens=None, stop_check=None):
         client = self._clients.get(self.platform)
         if not client:
             callback("error", f"{self.platform} API Key 未配置")
@@ -105,26 +105,32 @@ class ChatClient:
             completion = client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                max_tokens=self.max_tokens,
+                max_tokens=max_tokens or self.max_tokens,
+                temperature=temperature if temperature is not None else self.temperature,
                 extra_body=extra_body if extra_body else None,
                 stream=stream
             )
             has_started_content = False
-            for chunk in completion:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
-                    if not has_started_content:
-                        callback("thinking", delta.reasoning_content)
-                if hasattr(delta, "content") and delta.content:
-                    if not has_started_content:
-                        has_started_content = True
-                    callback("content", delta.content)
+            try:
+                for chunk in completion:
+                    if stop_check and stop_check():
+                        break
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+                        if not has_started_content:
+                            callback("thinking", delta.reasoning_content)
+                    if hasattr(delta, "content") and delta.content:
+                        if not has_started_content:
+                            has_started_content = True
+                        callback("content", delta.content)
+            except Exception:
+                pass
         except Exception as e:
             callback("error", str(e))
 
-    def chat_with_model(self, messages, callback, platform=None, model=None, stream=True):
+    def chat_with_model(self, messages, callback, platform=None, model=None, stream=True, temperature=None, max_tokens=None, stop_check=None):
         """使用指定的平台和模型进行 chat 调用"""
         client = self._clients.get(platform)
         if not client:
@@ -135,22 +141,28 @@ class ChatClient:
             completion = client.chat.completions.create(
                 model=model,
                 messages=messages,
-                max_tokens=self.max_tokens,
+                max_tokens=max_tokens or self.max_tokens,
+                temperature=temperature if temperature is not None else self.temperature,
                 extra_body=extra_body if extra_body else None,
                 stream=stream
             )
             has_started_content = False
-            for chunk in completion:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
-                    if not has_started_content:
-                        callback("thinking", delta.reasoning_content)
-                if hasattr(delta, "content") and delta.content:
-                    if not has_started_content:
-                        has_started_content = True
-                    callback("content", delta.content)
+            try:
+                for chunk in completion:
+                    if stop_check and stop_check():
+                        break
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+                        if not has_started_content:
+                            callback("thinking", delta.reasoning_content)
+                    if hasattr(delta, "content") and delta.content:
+                        if not has_started_content:
+                            has_started_content = True
+                        callback("content", delta.content)
+            except Exception:
+                pass
         except Exception as e:
             callback("error", str(e))
 
@@ -160,7 +172,8 @@ class ChatClient:
         elif platform == "DeepSeek":
             return {"thinking": {"type": "enabled"}, "reasoning_effort": self.thinking_level}
         elif platform == "智谱":
-            return {"thinking": {"type": "enabled"}, "reasoning_effort": self.thinking_level}
+            # 智谱 GLM 仅支持 thinking.type，不支持 reasoning_effort
+            return {"thinking": {"type": "enabled"}}
         return None
 
     def _get_extra_body(self):

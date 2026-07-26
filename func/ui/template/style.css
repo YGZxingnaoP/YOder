@@ -14,19 +14,38 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html {
+    width: 100%;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+    background: #c8ccd4;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    width: 100%;
     height: 100vh;
+    max-width: 100%;
+    max-height: 100%;
+    min-height: 0;
+    margin: 0 !important;
+    padding: 0 !important;
     display: flex;
     overflow: hidden;
     background: linear-gradient(135deg, #b8bcc8 0%, #d0d4de 40%, #c4c8d4 70%, #b0b8c8 100%);
 }
 
-/* 自定义滚动条 */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* 自定义滚动条 - 加宽提高可抓取性 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 4px; min-height: 40px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.32); }
+::-webkit-scrollbar-thumb:active { background: rgba(0,0,0,0.42); }
+::-webkit-scrollbar-corner { background: transparent; }
 
 
 /* ==================== 左侧边栏 ==================== */
@@ -55,12 +74,12 @@ body {
 .sidebar-left > button:hover { opacity: 0.9; box-shadow: 0 4px 12px rgba(0,122,255,0.35); }
 
 /* ==================== 主区域 ==================== */
-.main-area { flex: 1; display: flex; flex-direction: column; position: relative; background: transparent; overflow: hidden; z-index: 1; }
+.main-area { flex: 1; display: flex; flex-direction: column; position: relative; background: transparent; overflow: hidden; z-index: 1; min-width: 0; }
 .chat-background { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: var(--wallpaper-path); background-size: cover; background-position: center; opacity: var(--wallpaper-opacity); z-index: 0; pointer-events: none; }
-.chat-area { flex: 1; overflow-y: auto; padding: 24px; position: relative; z-index: 1; }
+.chat-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px; position: relative; z-index: 1; min-width: 0; min-height: 0; }
 
 /* ==================== 消息气泡 ==================== */
-.message { margin-bottom: 20px; display: flex; position: relative; z-index: 1; }
+.message { margin-bottom: 20px; display: flex; position: relative; z-index: 1; min-width: 0; }
 .message.user { flex-direction: row-reverse; }
 .message.user .avatar { margin-right: 0; margin-left: 12px; }
 .message.user .content { border-top-right-radius: 12px; border-top-left-radius: 4px; }
@@ -77,6 +96,7 @@ body {
     border-radius: 14px;
     max-width: 70%;
     word-break: break-word;
+    overflow-wrap: break-word;
     box-shadow: 0 2px 12px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.35);
     line-height: 1.9;
     font-size: 14.5px;
@@ -103,16 +123,37 @@ details.thinking-details summary::before { content: '\25B8'; margin-right: 6px; 
 details.thinking-details[open] summary::before { transform: rotate(90deg); }
 .thinking-content { margin-top: 8px; padding: 12px; background: rgba(0,0,0,0.04); border-left: 3px solid rgba(0,0,0,0.12); border-radius: 4px; white-space: normal; word-break: break-word; font-size: 13.5px; color: #555; max-height: 400px; overflow-y: auto; line-height: 1.7; }
 
+/* ==================== 折叠块 ==================== */
+.fold-block { border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 12px; margin-bottom: 12px; }
+.assistant .content .fold-block { background: transparent; padding: 0; border-radius: 0; box-shadow: none; }
+details.fold-details summary { list-style: none; cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; color: #2e7d32; display: flex; align-items: center; }
+details.fold-details summary::before { content: '\25B8'; margin-right: 6px; transition: transform 0.2s; display: inline-block; }
+details.fold-details[open] summary::before { transform: rotate(90deg); }
+.fold-content { margin-top: 8px; padding: 12px 16px; background: rgba(0,128,0,0.04); border-left: 3px solid rgba(0,128,0,0.2); border-radius: 4px; white-space: normal; word-break: break-word; font-size: 13.5px; color: #555; max-height: 400px; overflow-y: auto; line-height: 1.7; }
+.fold-content p { margin-bottom: 8px; }
+.fold-content p:last-child { margin-bottom: 0; }
+.fold-content ul, .fold-content ol { padding-left: 20px; margin: 6px 0; }
+.fold-content li { margin-bottom: 4px; line-height: 1.6; }
+.fold-content li:last-child { margin-bottom: 0; }
+.fold-content h1, .fold-content h2, .fold-content h3, .fold-content h4 { margin: 10px 0 6px; font-size: 14px; color: #2e7d32; }
+.fold-content h1 { font-size: 16px; }
+.fold-content h2 { font-size: 15px; }
+.fold-content code { background: rgba(0,128,0,0.08); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; color: #2e7d32; }
+.fold-content pre { margin: 8px 0; border-radius: 8px; }
+.fold-content pre code { background: transparent !important; padding: 0 !important; color: #abb2bf; }
+.fold-content strong { color: #333; }
+.fold-content blockquote { border-left: 3px solid rgba(0,128,0,0.25); padding-left: 12px; margin: 8px 0; color: #666; }
+
 /* ==================== 文件卡片 ==================== */
 .file-card { margin: 10px 0; background: rgba(255,255,255,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.35); }
 .file-card summary { padding: 10px 14px; cursor: pointer; font-size: 13px; color: #333; display: flex; align-items: center; gap: 8px; user-select: none; }
 .file-card summary:hover { background: rgba(255,255,255,0.2); border-radius: 8px; }
 .file-card .file-path { color: #888; font-size: 11px; margin-left: 8px; }
 .file-card pre { margin: 0; padding: 12px; background: #282c34; color: #abb2bf; border-radius: 0 0 8px 8px; overflow-x: auto; font-size: 12px; max-height: 300px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.1); }
-.file-card pre code { background: transparent !important; padding: 0 !important; }
+.file-card pre code { background: transparent !important; padding: 0 !important; color: #abb2bf; }
 
 /* ==================== KaTeX ==================== */
-.katex-display { background: rgba(255,255,255,0.65); border-radius: 10px; padding: 16px; margin: 12px 0; overflow-x: auto; text-align: center; border: 1px solid rgba(255,255,255,0.35); }
+.katex-display { background: rgba(255,255,255,0.65); border-radius: 10px; padding: 16px; margin: 12px 0; overflow-x: auto; text-align: center; border: 1px solid rgba(255,255,255,0.35); max-width: 100%; }
 .katex-display > .katex { text-align: center; }
 
 /* ==================== 输入区域 ==================== */
@@ -126,6 +167,14 @@ details.thinking-details[open] summary::before { transform: rotate(90deg); }
 .send-btn, .load-btn { padding: 8px 16px; border: none; border-radius: 8px; background: var(--accent-color); color: white; cursor: pointer; font-weight: 500; transition: opacity 0.2s; white-space: nowrap; }
 .send-btn:hover, .load-btn:hover { opacity: 0.9; }
 .send-btn:disabled, .load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.stop-btn {
+    padding: 8px 16px; border: none; border-radius: 8px;
+    background: #e53935; color: white; cursor: pointer;
+    font-weight: 600; transition: background 0.2s, transform 0.1s;
+    white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+}
+.stop-btn:hover { background: #c62828; }
+.stop-btn:active { transform: scale(0.96); }
 .settings-btn { position: absolute; bottom: 12px; left: 12px; background: none; border: none; font-size: 18px; cursor: pointer; opacity: 0.4; transition: opacity 0.2s; z-index: 10; }
 .settings-btn:hover { opacity: 0.8; }
 .memory-btn { position: absolute; bottom: 12px; left: 44px; background: none; border: none; font-size: 18px; cursor: pointer; opacity: 0.4; transition: opacity 0.2s; z-index: 10; }
@@ -141,6 +190,7 @@ details.thinking-details[open] summary::before { transform: rotate(90deg); }
 .model-bar-clickable { cursor: pointer; transition: background 0.15s, opacity 0.15s; user-select: none; }
 .model-bar-clickable:hover { background: rgba(0,122,255,0.2); opacity: 0.85; }
 .summarize-status { margin-left: auto; color: #888; font-size: 11px; font-style: italic; }
+
 
 /* 侧边栏控制按钮（贴在主区域边缘） */
 .sidebar-toggle-btn {
@@ -214,48 +264,94 @@ details.thinking-details[open] summary::before { transform: rotate(90deg); }
 .content.rendered p { margin-bottom: 14px; line-height: 1.9; }
 .content.rendered p:last-child { margin-bottom: 0; }
 
-.assistant-output { margin-top: 0; }
+.content img, .content iframe, .content video, .content svg { max-width: 100%; }
 .thinking-block + .assistant-text-block { margin-top: 12px; }
 .thinking-block + .assistant-text { margin-top: 12px; }
 
-pre { background: #282c34; color: #abb2bf; border-radius: 10px; padding: 16px; overflow-x: auto; margin: 12px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
-pre code { background: transparent !important; padding: 0 !important; font-family: 'Fira Code','Consolas',monospace; font-size: 13px; }
+pre { background: #282c34; color: #abb2bf; border-radius: 10px; padding: 16px; overflow-x: auto; margin: 12px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; max-width: 100%; white-space: pre-wrap; word-break: break-all; }
+pre code { background: transparent !important; padding: 0 !important; font-family: 'Fira Code','Consolas',monospace; font-size: 13px; color: #abb2bf; }
 code { background: rgba(0,0,0,0.06); padding: 2px 4px; border-radius: 4px; font-size: 0.9em; }
 
-/* ==================== 对话配置面板 ==================== */
-.conv-config-panel {
-    background: rgba(255,255,255,0.7); border-bottom: 1px solid var(--glass-border);
-    z-index: 2; flex-shrink: 0;
+/* ==================== 对话配置模态框 ==================== */
+.conv-config-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.35); display: flex;
+    align-items: center; justify-content: center; z-index: 9999;
 }
-.config-panel-header {
-    padding: 8px 16px; display: flex; justify-content: space-between; align-items: center;
-    background: rgba(255,255,255,0.3); border-bottom: 1px solid rgba(255,255,255,0.2);
-    font-size: 13px; font-weight: 600; color: #444;
+.conv-config-dialog {
+    background: #fff; border-radius: 16px;
+    width: 440px; max-width: 90vw;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.15);
+    overflow: hidden; animation: configDialogIn 0.2s ease;
 }
-.config-collapse-btn {
-    background: none; border: none; cursor: pointer; font-size: 14px; color: #666; padding: 2px 6px; border-radius: 4px;
+@keyframes configDialogIn {
+    from { opacity: 0; transform: translateY(-20px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.config-collapse-btn:hover { background: rgba(0,0,0,0.05); }
-.config-panel-body { padding: 10px 16px; }
-.config-row {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
+.config-dialog-header {
+    padding: 18px 24px; display: flex;
+    justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #eee;
 }
-.config-row:last-child { margin-bottom: 0; }
-.config-toggle {
-    display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #444;
-    padding: 4px 8px; border-radius: 6px; transition: background 0.15s;
+.config-dialog-header span { font-size: 15px; font-weight: 600; color: #333; }
+.config-dialog-close {
+    background: none; border: none; cursor: pointer;
+    font-size: 18px; color: #999; padding: 2px 6px; border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
 }
-.config-toggle:hover { background: rgba(0,0,0,0.04); }
-.config-toggle input[type="checkbox"] { accent-color: var(--accent-color); }
-.config-detail { padding: 8px 0 0 0; }
-.config-detail label { font-size: 12px; color: #666; white-space: nowrap; }
-.config-detail select, .config-detail input[type="text"], .config-detail input[type="number"] {
-    padding: 4px 8px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px;
-    background: rgba(255,255,255,0.7); font-size: 12px; outline: none;
+.config-dialog-close:hover { background: #f0f0f0; color: #333; }
+.config-dialog-body { padding: 20px 24px; }
+.config-section {
+    margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid #f5f5f5;
 }
-.config-detail select { min-width: 80px; }
-.config-detail input[type="text"] { width: 120px; }
-.config-detail input[type="number"] { width: 80px; }
+.config-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.config-dialog-body .config-toggle {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    font-size: 14px; color: #444; padding: 6px 0;
+}
+.config-dialog-body .config-toggle input[type="checkbox"] { accent-color: var(--accent-color); width: 16px; height: 16px; }
+.config-dialog-body .config-detail {
+    margin-top: 10px; padding: 14px; background: #f8f9fa;
+    border-radius: 10px; border: 1px solid #eee;
+}
+.config-dialog-body .config-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.config-dialog-body .config-row:last-child { margin-bottom: 0; }
+.config-dialog-body .config-row label { font-size: 12px; color: #666; white-space: nowrap; }
+.config-dialog-body .config-row select {
+    padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; font-size: 12px; outline: none; min-width: 80px;
+}
+.config-dialog-body .config-row input[type="text"] {
+    padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; font-size: 12px; outline: none; width: 130px;
+}
+.config-dialog-body .config-row input[type="number"] {
+    padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; font-size: 12px; outline: none; width: 90px;
+}
+.config-dialog-body textarea {
+    resize: vertical; font-size: 13px; width: 100%;
+    box-sizing: border-box; padding: 8px 12px; border: 1px solid #ddd;
+    border-radius: 8px; background: #fff; outline: none;
+    font-family: inherit; line-height: 1.5;
+}
+.config-dialog-body textarea:focus {
+    border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(0,122,255,0.1);
+}
+.config-dialog-footer {
+    padding: 14px 24px; display: flex; justify-content: flex-end;
+    gap: 10px; border-top: 1px solid #eee;
+}
+.config-btn {
+    padding: 8px 20px; border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+}
+.config-btn-cancel { background: #f0f0f0; color: #666; }
+.config-btn-cancel:hover { background: #e0e0e0; }
+.config-btn-confirm { background: var(--accent-color); color: white; }
+.config-btn-confirm:hover { opacity: 0.9; box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
 
 /* ==================== 思维链进度 ==================== */
 .chain-progress {
@@ -283,6 +379,17 @@ code { background: rgba(0,0,0,0.06); padding: 2px 4px; border-radius: 4px; font-
 .chain-btn:hover { opacity: 0.8; }
 .chain-btn.active { opacity: 1; color: var(--accent-color); }
 
+/* ==================== Agent 模式选择器 ==================== */
+.agent-mode-select {
+    position: absolute; bottom: 14px; left: 108px;
+    background: rgba(255,255,255,0.7); border: 1px solid rgba(0,122,255,0.25);
+    border-radius: 6px; padding: 2px 6px; font-size: 12px;
+    color: var(--accent-color); cursor: pointer; outline: none;
+    z-index: 10; opacity: 0.8; transition: opacity 0.2s;
+    width: 80px; flex-shrink: 0;
+}
+.agent-mode-select:hover { opacity: 1; }
+
 /* ==================== 拖拽分隔条 ==================== */
 .resizer { background: transparent; transition: background 0.2s; z-index: 10; }
 .resizer:hover { background: rgba(0,122,255,0.3); }
@@ -294,6 +401,8 @@ code { background: rgba(0,0,0,0.06); padding: 2px 4px; border-radius: 4px; font-
 .message.assistant .content:hover .msg-actions { opacity: 1; }
 .regen-btn { background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.4); border-radius: 10px; padding: 3px 8px; font-size: 11px; color: #555; cursor: pointer; transition: all 0.2s; }
 .regen-btn:hover { background: rgba(255,255,255,0.8); color: #333; }
+.fold-all-btn { background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.4); border-radius: 10px; padding: 3px 8px; font-size: 11px; color: #555; cursor: pointer; transition: all 0.2s; }
+.fold-all-btn:hover { background: rgba(255,255,255,0.8); color: #333; }
 
 /* 删除按钮 —— 定位在用户气泡内部左下角 */
 .msg-delete {

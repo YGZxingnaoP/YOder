@@ -2,9 +2,9 @@ import json
 import os
 import sys
 from PySide6.QtWidgets import (
-    QDialog, QFormLayout, QLineEdit, QComboBox, QSpinBox,
+    QDialog, QFormLayout, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
     QDialogButtonBox, QVBoxLayout, QHBoxLayout, QLabel, QWidget,
-    QPushButton, QCheckBox
+    QPushButton, QCheckBox, QTextEdit
 )
 from PySide6.QtCore import Qt
 
@@ -17,9 +17,7 @@ def _get_base_dir():
 BASE_DIR = _get_base_dir()
 CONFIG_PATH = os.path.join(BASE_DIR, "config", "info.json")
 
-from func.chatbot.port import PLATFORM_MODELS
-
-PLATFORMS = list(PLATFORM_MODELS.keys())
+from func.chatbot.port import PLATFORMS
 
 class ConfigDialog(QDialog):
     def __init__(self, parent=None):
@@ -40,6 +38,7 @@ class ConfigDialog(QDialog):
             "memory_rounds": 50,
             "thinking_level": "high",
             "max_tokens": 65536,
+            "temperature": 0.7,
         }
 
     def _save_config(self):
@@ -57,11 +56,8 @@ class ConfigDialog(QDialog):
         self.platform_combo.addItems(PLATFORMS)
         self.platform_combo.setCurrentText(self.config.get("platform", "阿里"))
 
-        self.model_combo = QComboBox()
-        self.model_combo.setEditable(True)
-        self.model_combo.setInsertPolicy(QComboBox.NoInsert)
-        self._update_model_list(self.platform_combo.currentText())
-        self.model_combo.setCurrentText(self.config.get("model", "qwen-max"))
+        self.model_edit = QLineEdit(self.config.get("model", "qwen-max"))
+        self.model_edit.setPlaceholderText("输入模型名称")
 
         self.key_edits = {}
         for p in PLATFORMS:
@@ -77,6 +73,12 @@ class ConfigDialog(QDialog):
         self.max_tokens_spin.setRange(1, 1000000)
         self.max_tokens_spin.setValue(self.config.get("max_tokens", 65536))
 
+        self.temperature_spin = QDoubleSpinBox()
+        self.temperature_spin.setRange(0.0, 2.0)
+        self.temperature_spin.setSingleStep(0.1)
+        self.temperature_spin.setDecimals(2)
+        self.temperature_spin.setValue(self.config.get("temperature", 0.7))
+
         thinking_container = QWidget()
         thinking_layout = QHBoxLayout(thinking_container)
         thinking_layout.setContentsMargins(0, 0, 0, 0)
@@ -90,12 +92,11 @@ class ConfigDialog(QDialog):
         form.addRow("AI 平台:", self.platform_combo)
         for p in PLATFORMS:
             form.addRow(f"{p} API Key:", self.key_edits[p])
-        form.addRow("模型:", self.model_combo)
+        form.addRow("模型:", self.model_edit)
         form.addRow(self.thinking_container)
         form.addRow("记忆轮数:", self.memory_spin)
         form.addRow("Max Tokens:", self.max_tokens_spin)
-
-        self.platform_combo.currentTextChanged.connect(self._on_platform_changed)
+        form.addRow("Temperature:", self.temperature_spin)
 
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -103,29 +104,17 @@ class ConfigDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    def _on_platform_changed(self, platform):
-        self._update_model_list(platform)
-
-    def _update_model_list(self, platform):
-        current = self.model_combo.currentText()
-        self.model_combo.clear()
-        models = PLATFORM_MODELS.get(platform, [])
-        self.model_combo.addItems(models)
-        if current in models:
-            self.model_combo.setCurrentText(current)
-        elif current:
-            self.model_combo.setCurrentText(current)
-
     def _on_accept(self):
         keys = self.config.get("api_keys", {})
         for p, edit in self.key_edits.items():
             keys[p] = edit.text()
         self.config["api_keys"] = keys
         self.config["platform"] = self.platform_combo.currentText()
-        self.config["model"] = self.model_combo.currentText()
+        self.config["model"] = self.model_edit.text().strip()
         self.config["memory_rounds"] = self.memory_spin.value()
         self.config["thinking_level"] = self.thinking_combo.currentText()
         self.config["max_tokens"] = self.max_tokens_spin.value()
+        self.config["temperature"] = self.temperature_spin.value()
         self._save_config()
         self.accept()
 
@@ -150,25 +139,20 @@ class MemoryConfigDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
-        # 开关
-        from PySide6.QtWidgets import QCheckBox
         self.enabled_check = QCheckBox("启用记忆概括")
         self.enabled_check.setChecked(self.mem_cfg.get("enabled", False))
         form.addRow(self.enabled_check)
 
-        # 概括轮次
         self.summarize_spin = QSpinBox()
         self.summarize_spin.setRange(2, 200)
         self.summarize_spin.setValue(self.mem_cfg.get("summarize_after", 10))
         form.addRow("每 N 轮概括一次:", self.summarize_spin)
 
-        # 概括字数
         self.chars_spin = QSpinBox()
         self.chars_spin.setRange(200, 20000)
         self.chars_spin.setValue(self.mem_cfg.get("max_summary_chars", 2000))
         form.addRow("概括字数上限:", self.chars_spin)
 
-        # 合并段数
         self.merge_spin = QSpinBox()
         self.merge_spin.setRange(2, 50)
         self.merge_spin.setValue(self.mem_cfg.get("merge_every", 5))
@@ -176,7 +160,6 @@ class MemoryConfigDialog(QDialog):
 
         layout.addLayout(form)
 
-        # 现有概括摘要
         summaries = self.mem_cfg.get("summaries", [])
         if summaries:
             info_label = QLabel(f"当前已有 {len(summaries)} 段概括")
@@ -202,13 +185,17 @@ class MemoryConfigDialog(QDialog):
 class ModelConfigDialog(QDialog):
     """对话级模型绑定对话框"""
 
-    def __init__(self, parent=None, current_platform=None, current_model=None, is_enabled=True):
+    def __init__(self, parent=None, current_platform=None, current_model=None, 
+                 is_enabled=True, max_tokens=None, temperature=None, system_prompt=""):
         super().__init__(parent)
         self.setWindowTitle("对话模型设置")
-        self.resize(420, 240)
+        self.resize(420, 420)
         self._current_platform = current_platform or "阿里"
         self._current_model = current_model or "qwen-max"
         self._enabled = is_enabled
+        self._max_tokens = max_tokens
+        self._temperature = temperature
+        self._system_prompt = system_prompt
         self._cleared = False
         self._init_ui()
 
@@ -216,7 +203,6 @@ class ModelConfigDialog(QDialog):
         from PySide6.QtWidgets import QCheckBox
         layout = QVBoxLayout(self)
 
-        # 启用开关
         self.enabled_check = QCheckBox("为此对话绑定独立模型（关闭则使用全局模型）")
         self.enabled_check.setChecked(self._enabled)
         self.enabled_check.toggled.connect(self._on_enabled_toggled)
@@ -228,23 +214,40 @@ class ModelConfigDialog(QDialog):
         self.platform_combo.addItems(PLATFORMS)
         self.platform_combo.setCurrentText(self._current_platform)
 
-        self.model_combo = QComboBox()
-        self.model_combo.setEditable(True)
-        self.model_combo.setInsertPolicy(QComboBox.NoInsert)
-        self._update_model_list(self.platform_combo.currentText())
-        self.model_combo.setCurrentText(self._current_model)
+        self.model_edit = QLineEdit(self._current_model)
+        self.model_edit.setPlaceholderText("输入模型名称")
+
+        self.max_tokens_spin = QSpinBox()
+        self.max_tokens_spin.setRange(1, 1000000)
+        self.max_tokens_spin.setValue(self._max_tokens or 65536)
+
+        self.temperature_spin = QDoubleSpinBox()
+        self.temperature_spin.setRange(0.0, 2.0)
+        self.temperature_spin.setSingleStep(0.1)
+        self.temperature_spin.setDecimals(2)
+        self.temperature_spin.setValue(self._temperature if self._temperature is not None else 0.7)
 
         form.addRow("AI 平台:", self.platform_combo)
-        form.addRow("模型:", self.model_combo)
-
-        self.platform_combo.currentTextChanged.connect(self._on_platform_changed)
+        form.addRow("模型:", self.model_edit)
+        form.addRow("Max Tokens:", self.max_tokens_spin)
+        form.addRow("Temperature:", self.temperature_spin)
 
         layout.addLayout(form)
 
-        # 初始状态：如果未启用则禁用选择框
+        # 系统提示词
+        prompt_label = QLabel("系统提示词（仅 Agent 模式生效）:")
+        prompt_label.setStyleSheet("font-size: 12px; color: #555; margin-top: 8px;")
+        layout.addWidget(prompt_label)
+        self.prompt_edit = QTextEdit()
+        self.prompt_edit.setPlaceholderText("输入系统提示词，将注入到 Agent 模式的总结阶段...")
+        self.prompt_edit.setMaximumHeight(100)
+        self.prompt_edit.setStyleSheet("font-size: 12px;")
+        if self._system_prompt:
+            self.prompt_edit.setPlainText(self._system_prompt)
+        layout.addWidget(self.prompt_edit)
+
         self._on_enabled_toggled(self._enabled)
 
-        # 清除绑定按钮
         clear_btn = QPushButton("恢复为全局默认")
         clear_btn.setStyleSheet("color: #888; font-size: 12px;")
         clear_btn.clicked.connect(self._on_clear)
@@ -258,20 +261,7 @@ class ModelConfigDialog(QDialog):
     def _on_enabled_toggled(self, checked):
         """当开关切换时，启用/禁用平台与模型选择框"""
         self.platform_combo.setEnabled(checked)
-        self.model_combo.setEnabled(checked)
-
-    def _on_platform_changed(self, platform):
-        self._update_model_list(platform)
-
-    def _update_model_list(self, platform):
-        current = self.model_combo.currentText()
-        self.model_combo.clear()
-        models = PLATFORM_MODELS.get(platform, [])
-        self.model_combo.addItems(models)
-        if current in models:
-            self.model_combo.setCurrentText(current)
-        elif current:
-            self.model_combo.setCurrentText(current)
+        self.model_edit.setEnabled(checked)
 
     def _on_clear(self):
         self._cleared = True
@@ -288,4 +278,10 @@ class ModelConfigDialog(QDialog):
         return self._enabled
 
     def get_values(self):
-        return self.platform_combo.currentText(), self.model_combo.currentText()
+        return (self.platform_combo.currentText(), 
+                self.model_edit.text().strip(),
+                self.max_tokens_spin.value(),
+                self.temperature_spin.value())
+
+    def get_system_prompt(self):
+        return self.prompt_edit.toPlainText().strip()

@@ -23,8 +23,8 @@ def _ensure_records_dir():
 def parse_error(error_message: str) -> str:
     if not error_message:
         return "未知错误"
-    if re.search(r"(不支持.*上传|图片|文件|多模态|upload|image|file.*not supported)", error_message, re.I):
-        return "当前模型不支持上传图片或文件，请切换模型或移除附件。\n原始错误: " + error_message
+    if re.search(r"(不支持.*上传|图片|文件|多模态|upload|image|file.*not supported|multimodal|base64|image_url)", error_message, re.I):
+        return "当前模型不支持上传图片或文件，请切换支持多模态的模型。\n原始错误: " + error_message
     return error_message
 
 def _read_pdf(file_path: str) -> str:
@@ -87,6 +87,8 @@ def _guess_mime(file_path: str) -> Optional[str]:
         ".bmp": "image/bmp",
     }
     return mapping.get(ext, None)
+
+
 
 def build_message_list(
     system_prompt: str,

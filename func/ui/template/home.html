@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="../lib/katex.min.css" />
     <script src="../lib/katex.min.js"></script>
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-    <link rel="stylesheet" href="style.css?v=14" />
+    <link rel="stylesheet" href="style.css?v=35" />
 </head>
 <body>
     <div class="sidebar-left" id="sidebar-left">
@@ -23,38 +23,6 @@
         <div class="chat-background" id="chat-background"></div>
         <button class="sidebar-toggle-btn toggle-left-btn" id="toggle-left-btn" title="收起/展开对话列表">☰</button>
         <button class="sidebar-toggle-btn toggle-summary-btn" id="toggle-summary-btn" title="展开概括内容">📝</button>
-        <div class="conv-config-panel" id="conv-config-panel" style="display:none;">
-            <div class="config-panel-header">
-                <span>⚙️ 对话配置</span>
-                <button class="config-collapse-btn" id="config-collapse-btn" title="收起">▴</button>
-            </div>
-            <div class="config-panel-body">
-                <div class="config-row">
-                    <label class="config-toggle">
-                        <input type="checkbox" id="cfg-independent-model" />
-                        <span>使用独立模型配置</span>
-                    </label>
-                    <label class="config-toggle">
-                        <input type="checkbox" id="cfg-chain-mode" />
-                        <span>🧩 思维链模式</span>
-                    </label>
-                </div>
-                <div class="config-detail" id="config-model-detail" style="display:none;">
-                    <div class="config-row">
-                        <label>平台:</label>
-                        <select id="cfg-platform"></select>
-                        <label>模型:</label>
-                        <input type="text" id="cfg-model" placeholder="模型名称" />
-                    </div>
-                    <div class="config-row">
-                        <label>记忆轮数:</label>
-                        <input type="number" id="cfg-memory-rounds" value="50" min="1" max="1000" />
-                        <label>Max Tokens:</label>
-                        <input type="number" id="cfg-max-tokens" value="65536" min="1" max="2000000" />
-                    </div>
-                </div>
-            </div>
-        </div>
         <div class="chain-progress" id="chain-progress" style="display:none;">
             <div class="chain-status" id="chain-status">准备中...</div>
             <div class="chain-tasklist" id="chain-tasklist"></div>
@@ -70,9 +38,64 @@
             <div class="input-row">
                 <textarea id="user-input" placeholder="输入消息...（Enter 换行，Ctrl+Enter 发送）"></textarea>
                 <button class="send-btn" id="send-btn">发送</button>
+                <button class="stop-btn" id="stop-btn" style="display:none;" title="停止输出">⏹ 停止</button>
                 <button class="settings-btn" id="settings-btn" title="设置">⚙️</button>
                 <button class="memory-btn" id="memory-btn" title="记忆概括">🧠</button>
                 <button class="chain-btn" id="chain-btn" title="思维链模式">🧩</button>
+                <select class="agent-mode-select" id="agent-mode-select" title="Agent 模式">
+                    <option value="code">💻 代码</option>
+                    <option value="article">📝 文章</option>
+                    <option value="rp">🎭 RP</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <!-- 新建对话配置模态框 -->
+    <div class="conv-config-overlay" id="conv-config-overlay" style="display:none;">
+        <div class="conv-config-dialog">
+            <div class="config-dialog-header">
+                <span>⚙️ 新建对话配置</span>
+                <button class="config-dialog-close" id="config-dialog-close">✕</button>
+            </div>
+            <div class="config-dialog-body">
+                <div class="config-section">
+                    <label class="config-toggle">
+                        <input type="checkbox" id="cfg-chain-mode" />
+                        <span>🧩 思维链模式</span>
+                    </label>
+                </div>
+                <div class="config-section">
+                    <label class="config-toggle">
+                        <input type="checkbox" id="cfg-independent-model" />
+                        <span>🔧 使用独立模型</span>
+                    </label>
+                    <div class="config-detail" id="config-model-detail" style="display:none;">
+                        <div class="config-row">
+                            <label>平台:</label>
+                            <select id="cfg-platform"></select>
+                            <label>模型:</label>
+                            <input type="text" id="cfg-model" placeholder="模型名称" />
+                        </div>
+                        <div class="config-row">
+                            <label>记忆轮数:</label>
+                            <input type="number" id="cfg-memory-rounds" value="50" min="1" max="1000" />
+                            <label>Max Tokens:</label>
+                            <input type="number" id="cfg-max-tokens" value="65536" min="1" max="2000000" />
+                        </div>
+                        <div class="config-row">
+                            <label>Temperature:</label>
+                            <input type="number" id="cfg-temperature" value="0.7" min="0" max="2" step="0.1" />
+                        </div>
+                    </div>
+                </div>
+                <div class="config-section">
+                    <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">系统提示词（可选）:</label>
+                    <textarea id="cfg-system-prompt" placeholder="输入系统提示词..." rows="3"></textarea>
+                </div>
+            </div>
+            <div class="config-dialog-footer">
+                <button class="config-btn config-btn-cancel" id="config-cancel-btn">取消</button>
+                <button class="config-btn config-btn-confirm" id="config-confirm-btn">开始对话</button>
             </div>
         </div>
     </div>
@@ -100,6 +123,6 @@
         </div>
         <div class="file-tree" id="file-tree"></div>
     </div>
-    <script src="script.js?v=16"></script>
+    <script src="script.js?v=38"></script>
 </body>
 </html>

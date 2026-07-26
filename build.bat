@@ -1,23 +1,43 @@
 @echo off
-:: è®¾ç½®æ§åˆ¶å°ä¸º UTF-8 ç¼–ç ï¼Œé˜²æ­¢ä¸­æ–‡è·¯å¾„ä¹±ç 
+setlocal EnableDelayedExpansion
+:: ÉèÖÃ¿ØÖÆÌ¨Îª UTF-8 ±àÂë£¬·ÀÖ¹ÖĞÎÄÂ·¾¶ÂÒÂë
 chcp 65001 >nul
-title é¡¹ç›®æ‰“åŒ…ä¸ç¯å¢ƒé…ç½®å·¥å…· (Embedded Python ç‰ˆ)
+title ÏîÄ¿´ò°üÓë»·¾³ÅäÖÃ¹¤¾ß
 
 :: ==========================================
-:: é…ç½®åŒº (å¯æ ¹æ®å®é™…æƒ…å†µä¿®æ”¹)
+:: ÅäÖÃÇø
 :: ==========================================
 set ENTRY_FILE=run.py
 set APP_NAME=YOder
-set ICON_FILE=icon.png
-:: ã€å…³é”®ã€‘å†…åµŒ Python æ‰€åœ¨çš„ç›¸å¯¹ç›®å½•ï¼ˆè¯·æ ¹æ®å®é™…è§£å‹è·¯å¾„ä¿®æ”¹ï¼Œå¦‚ env, python ç­‰ï¼‰
+set ICON_FILE=icon.ico
+set ICON_SOURCE=icon.png
 set EMBEDDED_PYTHON_DIR=env
+set USE_PIP_CACHE=YES
+set INCREMENTAL_BUILD=YES
 
 echo ==========================================
-echo        å¼€å§‹ç¯å¢ƒæ£€æµ‹ä¸åˆå§‹åŒ– (Embedded)
+echo        ¿ªÊ¼»·¾³¼ì²âÓë³õÊ¼»¯
 echo ==========================================
 
-:: 1. æ£€æµ‹å†…åµŒ Python ç¯å¢ƒ (ä¼˜å…ˆæ£€æµ‹æœ¬åœ°ç›®å½•ï¼Œæ‹’ç»ä¾èµ–ç³»ç»Ÿå…¨å±€ç¯å¢ƒå˜é‡)
-echo [1/5] æ­£åœ¨æ£€æµ‹å†…åµŒ Python ç¯å¢ƒ...
+:: 0. ¼ì²éÊÇ·ñĞèÒªÖØĞÂÅäÖÃ»·¾³
+echo [0/6] ¼ì²é»·¾³ÅäÖÃ×´Ì¬...
+set NEED_RECONFIG=NO
+for %%I in ("%~dp0%EMBEDDED_PYTHON_DIR%") do set "PY_DIR=%%~dpI"
+if exist "%PY_DIR%*._pth" (
+    findstr /c:"import site" "%PY_DIR%*._pth" >nul
+    if !errorlevel! neq 0 set NEED_RECONFIG=YES
+) else (
+    set NEED_RECONFIG=YES
+)
+if not exist "%PY_DIR%pip" set NEED_RECONFIG=YES
+if !NEED_RECONFIG! == NO (
+    echo [Ìø¹ı] »·¾³ÒÑÅäÖÃ£¬Ìø¹ı³õÊ¼»¯²½Öè
+) else (
+    echo [ÌáÊ¾] ĞèÒªÖØĞÂÅäÖÃ»·¾³
+)
+
+:: 1. ¼ì²âÄÚÇ¶ Python »·¾³
+echo [1/6] ÕıÔÚ¼ì²âÄÚÇ¶ Python »·¾³...
 set PYTHON_CMD=
 if exist "%~dp0%EMBEDDED_PYTHON_DIR%\python.exe" (
     set "PYTHON_CMD=%~dp0%EMBEDDED_PYTHON_DIR%\python.exe"
@@ -28,102 +48,155 @@ if exist "%~dp0python.exe" (
     goto :python_found
 )
 
-echo [é”™è¯¯] æœªåœ¨å½“å‰ç›®å½•æˆ– %EMBEDDED_PYTHON_DIR% ç›®å½•ä¸‹æ‰¾åˆ° python.exeï¼
-echo [æç¤º] è¯·ç¡®ä¿å·²ä¸‹è½½ Python Embedded (å†…åµŒç‰ˆ) å¹¶è§£å‹åˆ°æ­£ç¡®ç›®å½•ã€‚
+echo [´íÎó] Î´ÕÒµ½ python.exe£¡
 pause & exit /b 1
 
 :python_found
 for /f "tokens=*" %%i in ('"%PYTHON_CMD%" --version 2^>^&1') do set PYTHON_VERSION=%%i
-echo [æˆåŠŸ] æ£€æµ‹åˆ° %PYTHON_VERSION% (è·¯å¾„: %PYTHON_CMD%)
+echo [³É¹¦] ¼ì²âµ½ %PYTHON_VERSION%  Â·¾¶: %PYTHON_CMD%
 
-:: 2. å®‰å…¨é…ç½® _pth æ–‡ä»¶ (ä½¿ç”¨å†…åµŒ Python è‡ªèº«ä¿®æ”¹ï¼Œé¿å… PowerShell å¼•å…¥ BOM ç¼–ç é—®é¢˜)
-echo [2/5] æ­£åœ¨å®‰å…¨é…ç½®å†…åµŒ Python è·¯å¾„ (_pth)...
+:: 2. °²È«ÅäÖÃ _pth ÎÄ¼ş
+if !NEED_RECONFIG! == YES goto :reconfig_env
+goto :skip_reconfig
+
+:reconfig_env
+echo [2/6] ÕıÔÚ°²È«ÅäÖÃÄÚÇ¶ Python Â·¾¶...
 for %%I in ("%PYTHON_CMD%") do set "PY_DIR=%%~dpI"
 
-:: ä½¿ç”¨å†…åµŒ Python æ‰§è¡Œå•è¡Œè„šæœ¬ä¿®æ”¹ _pthï¼Œå–æ¶ˆ #import site æ³¨é‡Š
-"%PYTHON_CMD%" -c ^
-"import os, glob; ^
-pth_files = glob.glob(os.path.join(r'%PY_DIR%', '*._pth')); ^
-pth = pth_files[0] if pth_files else None; ^
-exit(0) if not pth else None; ^
-content = open(pth, 'r', encoding='utf-8').read(); ^
-content = content.replace('#import site', 'import site'); ^
-open(pth, 'w', encoding='utf-8').write(content); ^
-print(f'[æˆåŠŸ] å·²åœ¨ {os.path.basename(pth)} ä¸­å¯ç”¨ import site')"
+"%PYTHON_CMD%" -c "import os, glob; pth_files = glob.glob(os.path.join(r'%PY_DIR%', '*._pth')); pth = pth_files[0] if pth_files else None; exit(0) if not pth else None; content = open(pth, 'r', encoding='utf-8').read(); content = content.replace('#import site', 'import site'); open(pth, 'w', encoding='utf-8').write(content); print(f'[³É¹¦] ÒÑÔÚ {os.path.basename(pth)} ÖĞÆôÓÃ import site')"
 
-:: è¿½åŠ  Lib\site-packages åˆ°æœç´¢è·¯å¾„ (ä½¿ç”¨ findstr é˜²æ­¢é‡å¤è¿½åŠ )
 for %%f in ("%PY_DIR%*._pth") do (
     findstr /i /c:"Lib\site-packages" "%%f" >nul || echo Lib\site-packages>> "%%f"
 )
 
-:: 3. åˆå§‹åŒ– pip ç¯å¢ƒ (Embedded é»˜è®¤æ—  pipï¼Œéœ€æ‰‹åŠ¨å¼•å¯¼)
-echo [3/5] æ­£åœ¨æ£€æµ‹å¹¶åˆå§‹åŒ– pip...
+:skip_reconfig
+
+:: 3. ³õÊ¼»¯ pip »·¾³
+if !NEED_RECONFIG! == YES goto :init_pip
+goto :skip_pip
+
+:init_pip
+echo [3/6] ÕıÔÚ¼ì²â²¢³õÊ¼»¯ pip...
 "%PYTHON_CMD%" -m pip --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ä¿¡æ¯] æœªæ£€æµ‹åˆ° pipï¼Œæ­£åœ¨ä¸‹è½½ get-pip.py...
+if !errorlevel! neq 0 (
+    echo [ĞÅÏ¢] Î´¼ì²âµ½ pip£¬ÕıÔÚÏÂÔØ get-pip.py...
     powershell -NoProfile -Command "Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile 'get-pip.py'"
     if not exist "get-pip.py" (
-        echo [é”™è¯¯] ä¸‹è½½ get-pip.py å¤±è´¥ï¼è¯·æ£€æŸ¥ç½‘ç»œè¿æ¥ã€‚
+        echo [´íÎó] ÏÂÔØ get-pip.py Ê§°Ü£¡
         pause & exit /b 1
     )
-    echo [ä¿¡æ¯] æ­£åœ¨å®‰è£… pipï¼Œè¯·ç¨å€™...
     "%PYTHON_CMD%" get-pip.py -i https://pypi.tuna.tsinghua.edu.cn/simple >nul 2>&1
     del /q get-pip.py
-    echo [æˆåŠŸ] pip åˆå§‹åŒ–å®Œæˆã€‚
+    echo [³É¹¦] pip ³õÊ¼»¯Íê³É¡£
 ) else (
-    echo [æˆåŠŸ] æ£€æµ‹åˆ° pip ç¯å¢ƒã€‚
+    echo [³É¹¦] ¼ì²âµ½ pip »·¾³¡£
 )
 
-:: 4. å®‰è£…é¡¹ç›®ä¾èµ–ä¸ PyInstaller
-echo [4/5] æ­£åœ¨å®‰è£…é¡¹ç›®ä¾èµ–ä¸ PyInstaller...
+:skip_pip
+
+:: 4. °²×°ÏîÄ¿ÒÀÀµÓë PyInstaller
+echo [4/6] ÕıÔÚ°²×°ÏîÄ¿ÒÀÀµÓë PyInstaller...
+if !USE_PIP_CACHE! == YES (
+    set PIP_CACHE_DIR=%~dp0\.pip_cache
+    if not exist "!PIP_CACHE_DIR!" mkdir "!PIP_CACHE_DIR!"
+    "%PYTHON_CMD%" -m pip config set global.cache-dir "!PIP_CACHE_DIR!" >nul 2>&1
+)
+
 "%PYTHON_CMD%" -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple >nul 2>&1
 if exist requirements.txt (
-    "%PYTHON_CMD%" -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple >nul 2>&1
+    "%PYTHON_CMD%" -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --quiet --exists-action w
 )
 "%PYTHON_CMD%" -m pip install --upgrade pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple >nul 2>&1
-echo [æˆåŠŸ] ä¾èµ–ä¸æ‰“åŒ…å·¥å…·å‡†å¤‡å°±ç»ªã€‚
+
+echo [ÑéÖ¤] ¼ì²é¹Ø¼üÒÀÀµ...
+"%PYTHON_CMD%" -c "import PySide6; print('[OK] PySide6:', PySide6.__version__)" 2>nul || echo [¾¯¸æ] PySide6 Î´°²×°
+"%PYTHON_CMD%" -c "import fitz; print('[OK] fitz ready')" 2>nul || echo [¾¯¸æ] fitz Î´°²×°
+
+echo [³É¹¦] ÒÀÀµÓë´ò°ü¹¤¾ß×¼±¸¾ÍĞ÷¡£
 
 echo ==========================================
-echo        ç¯å¢ƒå‡†å¤‡å®Œæˆï¼Œå¼€å§‹æ ¸å¿ƒæ‰“åŒ…...
+echo        »·¾³×¼±¸Íê³É£¬¿ªÊ¼ºËĞÄ´ò°ü...
 echo ==========================================
 
-:: 5. PyInstaller æ ¸å¿ƒæ‰“åŒ…
-echo [æ‰“åŒ…ä¸­] æ­£åœ¨æ‰§è¡Œ PyInstallerï¼Œè€—æ—¶è¾ƒé•¿ï¼Œè¯·å‹¿å…³é—­çª—å£...
+:: 5. PyInstaller ºËĞÄ´ò°ü
+echo [´ò°üÖĞ] ÕıÔÚÖ´ĞĞ PyInstaller£¬ÇëÎğ¹Ø±Õ´°¿Ú...
+
+if /I "%INCREMENTAL_BUILD%"=="NO" (
+    if exist build rmdir /s /q build
+    if exist dist rmdir /s /q dist
+    if exist *.spec del /q *.spec
+)
 if exist build.log del /q build.log
+
+echo [ÌáÊ¾] ¿ªÊ¼´ò°ü£¬Ô¤¼ÆĞèÒª 2-5 ·ÖÖÓ...
+timeout /t 2 /nobreak >nul
+
+:: ×Ô¶¯Éú³É .ico Í¼±ê
+set ICON_ARG=
+if exist "%ICON_SOURCE%" (
+    if not exist "%ICON_FILE%" (
+        echo [ĞÅÏ¢] ÕıÔÚ½« %ICON_SOURCE% ×ª»»Îª %ICON_FILE%...
+        "%PYTHON_CMD%" -c "from PIL import Image; img = Image.open(r'%ICON_SOURCE%'); img.save(r'%ICON_FILE%', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+        if !errorlevel! neq 0 (
+            echo [¾¯¸æ] Í¼±ê×ª»»Ê§°Ü£¬½«Ê¹ÓÃÄ¬ÈÏÍ¼±ê
+        ) else (
+            set "ICON_ARG=--icon=%ICON_FILE%"
+        )
+    ) else (
+        set "ICON_ARG=--icon=%ICON_FILE%"
+    )
+)
 
 "%PYTHON_CMD%" -m PyInstaller ^
     --noconfirm ^
     --clean ^
     --onefile ^
     --windowed ^
-    --name "%APP_NAME%" ^
-    --icon="%ICON_FILE%" ^
+    --name "%APP_NAME%" !ICON_ARG! ^
     --add-data "func/ui;func/ui" ^
-    --add-data "%ICON_FILE%;." ^
+    --add-data "%ICON_SOURCE%;." ^
     --collect-all PySide6.QtWebEngineWidgets ^
     --collect-all PySide6.QtWebEngineCore ^
     --hidden-import=fitz ^
+    --log-level WARN ^
     "%ENTRY_FILE%" > build.log 2>&1
 
-:: 6. å¼‚å¸¸å¤„ç†ä¸äº§ç‰©éªŒè¯
-if %errorlevel% neq 0 (
-    echo [é”™è¯¯] æ‰“åŒ…å¤±è´¥ï¼è¯·æŸ¥çœ‹æ ¹ç›®å½•ä¸‹çš„ build.log æ’æŸ¥é”™è¯¯ã€‚
+echo [Íê³É] PyInstaller Ö´ĞĞÍê±Ï£¬ÍË³öÂë: !errorlevel!
+
+:: 6. Òì³£´¦ÀíÓë²úÎïÑéÖ¤
+if !errorlevel! neq 0 (
+    echo [´íÎó] ´ò°üÊ§°Ü£¡Çë²é¿´ build.log
+    more /e /tail:10 build.log
     pause & exit /b 1
 )
 
 set EXE_PATH=dist\%APP_NAME%.exe
 if not exist "%EXE_PATH%" (
-    echo [é”™è¯¯] æœªåœ¨ dist ç›®å½•æ‰¾åˆ° %APP_NAME%.exeï¼
+    echo [´íÎó] Î´ÔÚ dist Ä¿Â¼ÕÒµ½ %APP_NAME%.exe
     pause & exit /b 1
 )
 
 echo ==========================================
-echo        æ‰“åŒ…æˆåŠŸï¼
+echo        ´ò°ü³É¹¦£¡
 echo ==========================================
-echo [äº§ç‰©è·¯å¾„] %~dp0%EXE_PATH%
+echo [²úÎïÂ·¾¶] %~dp0%EXE_PATH%
+dir /-c "%EXE_PATH%" | findstr /C:"%APP_NAME%.exe"
 
-:: 7. ä¸´æ—¶æ–‡ä»¶æ¸…ç†
-if exist build rmdir /s /q build
-if exist *.spec del /q *.spec
-echo [æ¸…ç†] ä¸´æ—¶æ–‡ä»¶æ¸…ç†å®Œæ¯•ã€‚
+:: 7. ÁÙÊ±ÎÄ¼şÇåÀí
+if /I "%INCREMENTAL_BUILD%"=="NO" (
+    if exist build rmdir /s /q build
+    if exist *.spec del /q *.spec
+    echo [ÇåÀí] ÁÙÊ±ÎÄ¼şÇåÀíÍê±Ï
+) else (
+    echo [ÌáÊ¾] ÔöÁ¿´ò°üÄ£Ê½£¬±£ÁôÁËbuildÄ¿Â¼
+)
+
+echo.
+echo ==========================================
+echo ´ò°üÍê³É£¡
+echo ==========================================
+echo   1. ²âÊÔ dist\%APP_NAME%.exe
+echo   2. ¿É½« dist ÎÄ¼ş¼Ğ·Ö·¢¸øÆäËûÓÃ»§
+echo   3. ÖØĞÂ´ò°üÖ±½ÓÔËĞĞ build.bat
+echo.
 pause

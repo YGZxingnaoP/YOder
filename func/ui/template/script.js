@@ -27,7 +27,27 @@ const inlineMathExtension = {
         catch (e) { return token.raw; }
     }
 };
-marked.use({ extensions: [blockMathExtension, inlineMathExtension] });
+var codeHighlightExtension = {
+    name: 'code',
+    level: 'block',
+    renderer: function(token) {
+        var lang = token.lang || '';
+        var code = token.text;
+        var highlighted;
+        try {
+            if (lang && hljs.getLanguage(lang)) {
+                highlighted = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+            } else {
+                highlighted = hljs.highlightAuto(code).value;
+            }
+        } catch(e) {
+            highlighted = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+        var cls = lang ? ' class="hljs language-' + lang + '"' : ' class="hljs"';
+        return '<pre><code' + cls + '>' + highlighted + '</code></pre>\n';
+    }
+};
+marked.use({ extensions: [blockMathExtension, inlineMathExtension, codeHighlightExtension] });
 marked.setOptions({ breaks: true, gfm: true });
 
 // ====================================================================
@@ -37,15 +57,41 @@ var bridge = null, selectedFiles = new Set(), clickCount = 0, clickTimer = null,
 var sendDisabled = false, lastUserMessageElem = null, pendingInputText = '';
 var currentAssistantMsgDiv = null, currentRawText = "";
 var renderTimer = null;
+var foldRenderTimer = null;
 var RENDER_INTERVAL = 80;
 var summaryContentCache = '';
 var chainModeEnabled = false;
+var activeConvName = '';  // 当前选中的对话名称，防止重复点击
 var PLATFORMS = ['阿里', 'DeepSeek', '智谱', 'Kimi'];
 // 多块追踪：支持思考/内容交错显示在同一个气泡
 var msgBlocks = [];          // [{type, text, rawText, element, contentElement}, ...]
 var currentBlockIndex = -1;
 var currentBlockType = null;  // "thinking" | "content" | null
 var blockIdCounter = 0;
+var userScrolling = false;
+var scrollCheckTimer = null;
+var programScrolling = false;  // 标记程序正在执行自动滚底
+var programScrollTimer = null; // 用于可靠地重置 programScrolling 标志
+
+// 设置程序滚动标志，并使用 setTimeout 确保 scroll 事件被正确忽略
+// 比 requestAnimationFrame 更可靠：setTimeout 保证最小时延，不受渲染帧时序影响
+function setProgramScroll(el) {
+    programScrolling = true;
+    if (programScrollTimer) clearTimeout(programScrollTimer);
+    el.scrollTop = el.scrollHeight;
+    programScrollTimer = setTimeout(function() {
+        programScrolling = false;
+        programScrollTimer = null;
+    }, 120);
+}
+
+// 自动滚到底部（流式输出时尊重用户滚动，不强制拽回）
+function autoScrollBottom(el) {
+    if (!el || userScrolling) return;
+    if (el.scrollHeight > el.clientHeight) {
+        setProgramScroll(el);
+    }
+}
 
 function attemptConnection() {
     if (typeof QWebChannel === 'undefined') { setTimeout(attemptConnection, 500); return; }
@@ -65,11 +111,14 @@ function isBridgeReady() { return !!bridge; }
 // ====================================================================
 // 3. 对话列表管理
 // ====================================================================
-function updateConversationList(convs) {
+function updateConversationList(convs, activeFolder) {
     if (!bridge) return;
+    // 同步当前对话名称，确保 switchConv 的防重复点击正确工作
+    if (activeFolder) activeConvName = activeFolder;
     var convList = document.getElementById('conv-list');
     if (!convList) return;
     convList.innerHTML = '';
+    var activeLi = null;
     convs.forEach(function(name) {
         var li = document.createElement('li');
         var nameSpan = document.createElement('span');
@@ -89,16 +138,33 @@ function updateConversationList(convs) {
         });
         btnGroup.appendChild(renameBtn); btnGroup.appendChild(deleteBtn);
         li.appendChild(btnGroup);
+        var isActive = (activeFolder && name === activeFolder);
+        if (isActive) {
+            li.classList.add('active');
+            btnGroup.style.opacity = '1';
+            activeLi = li;
+        }
         li.addEventListener('mouseenter', function() { btnGroup.style.opacity = '1'; });
-        li.addEventListener('mouseleave', function() { btnGroup.style.opacity = '0'; });
+        li.addEventListener('mouseleave', function() {
+            if (!li.classList.contains('active')) btnGroup.style.opacity = '0';
+        });
         li.addEventListener('click', function(e) { switchConv(name, e.currentTarget); });
         convList.appendChild(li);
     });
+    // 自动滚动到活跃对话，或滚动到顶部显示最新对话（最新在上方）
+    if (activeLi) {
+        activeLi.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+        convList.scrollTop = 0;
+    }
 }
 
 function switchConv(name, liElement) {
     if (sendDisabled) { alert('正在生成回答，请稍后再试'); return; }
     if (!isBridgeReady()) return;
+    // 防止重复点击同一对话（避免重复异步调用导致白屏）
+    if (name === activeConvName) return;
+    activeConvName = name;
     selectedFiles.clear();
     hideConfigPanel();
     setChainMode(false);
@@ -106,8 +172,16 @@ function switchConv(name, liElement) {
         bridge.save_file_selection(JSON.stringify(Array.from(selectedFiles)));
     }
     bridge.switch_conversation(name);
-    document.querySelectorAll('#conv-list li').forEach(function(li) { li.classList.remove('active'); });
-    if (liElement) liElement.classList.add('active');
+    document.querySelectorAll('#conv-list li').forEach(function(li) {
+        li.classList.remove('active');
+        var bg = li.querySelector('div[style*="gap"]');
+        if (bg) bg.style.opacity = '0';
+    });
+    if (liElement) {
+        liElement.classList.add('active');
+        var bg = liElement.querySelector('div[style*="gap"]');
+        if (bg) bg.style.opacity = '1';
+    }
 }
 function renameConv(oldName) {
     if (!isBridgeReady()) return;
@@ -118,10 +192,21 @@ function newConversation() {
     if (sendDisabled) return;
     if (!isBridgeReady()) return;
     if (bridge && bridge.save_file_selection) bridge.save_file_selection(JSON.stringify(Array.from(selectedFiles)));
+    activeConvName = '';  // 重置，允许新建后再次点击
     bridge.switch_conversation(''); clearMessages(); clearFileTree();
     setChainMode(false);
     showConfigPanel();
     document.querySelectorAll('#conv-list li').forEach(function(li) { li.classList.remove('active'); });
+}
+function confirmNewConvConfig() {
+    if (!isBridgeReady()) return;
+    var cfg = getConvConfig();
+    hideConfigPanel();
+    try {
+        bridge.create_initial_folder(JSON.stringify(cfg));
+    } catch(e) {
+        console.error('创建对话失败:', e);
+    }
 }
 
 // ====================================================================
@@ -170,16 +255,31 @@ function addUserMessage(text, filesJson) {
     contentDiv.appendChild(deleteBtn);
     div.appendChild(contentDiv);
     chatArea.appendChild(div);
-    chatArea.scrollTop = chatArea.scrollHeight;
+    setProgramScroll(chatArea);
     return div;
 }
 function deleteTurn(btn) {
     if (sendDisabled || !isBridgeReady()) return;
     var userMsg = btn.closest('.message.user');
     if (!userMsg) return;
-    var allMsgs = Array.from(document.getElementById('chat-area').querySelectorAll('.message'));
-    var userIndex = allMsgs.indexOf(userMsg);
-    if (userIndex >= 0) bridge.delete_turn(String(userIndex));
+    
+    // 【修复1】仅统计 .message.user 来计算索引，确保与后端的轮次索引语义一致
+    var allUserMsgs = Array.from(document.getElementById('chat-area').querySelectorAll('.message.user'));
+    var userIndex = allUserMsgs.indexOf(userMsg);
+    
+    if (userIndex >= 0) {
+        // 调用后端删除接口，传递正确的逻辑序号
+        bridge.delete_turn(String(userIndex));
+        
+        // 【修复2】前端同步移除 DOM，保持 UI 与后端数据一致
+        var nextElem = userMsg.nextElementSibling;
+        userMsg.remove();
+        
+        // 单轮对话通常包含 user 和 assistant，如果后面紧跟着 assistant 回复，一并移除
+        if (nextElem && nextElem.classList.contains('assistant')) {
+            nextElem.remove();
+        }
+    }
 }
 function regenerate(btn) {
     if (sendDisabled || !isBridgeReady()) return;
@@ -191,10 +291,103 @@ function regenerate(btn) {
     var userMsg = assistantMsg.previousElementSibling;
     while (userMsg && !userMsg.classList.contains('user')) userMsg = userMsg.previousElementSibling;
     if (!userMsg) return;
-    assistantMsg.remove();
+    var isChainMode = userMsg.dataset.chainMode === '1';
     sendDisabled = true;
     document.getElementById('send-btn').disabled = true;
-    bridge.regenerate_message(userMsg.dataset.text, userMsg.dataset.files, JSON.stringify({chainMode: userMsg.dataset.chainMode === '1'}));
+    if (isChainMode) {
+        // Agent 模式：弹出选择对话框（先不删除消息，取消时保留）
+        showRegenerateDialog(userMsg.dataset.text, userMsg.dataset.files, userMsg, assistantMsg);
+    } else {
+        var savedText = userMsg.dataset.text;
+        var savedFiles = userMsg.dataset.files;
+        assistantMsg.remove();
+        userMsg.remove();
+        // 创建新的 user 消息 div（与正常发送流程一致）
+        addUserMessage(savedText, savedFiles);
+        bridge.regenerate_message(savedText, savedFiles, JSON.stringify({chainMode: false}));
+    }
+}
+
+function showRegenerateDialog(text, filesJson, userMsg, assistantMsg) {
+    // 移除已有弹窗
+    var existing = document.getElementById('regen-dialog-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'regen-dialog-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
+
+    var dialog = document.createElement('div');
+    dialog.style.cssText = 'background:var(--bg-color, #1e1e2e);color:var(--text-color, #e0e0e0);border-radius:12px;padding:24px;min-width:320px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.4);';
+
+    dialog.innerHTML = '<h3 style="margin:0 0 16px 0;font-size:16px;">🔄 重新生成选项</h3>' +
+        '<p style="margin:0 0 20px 0;font-size:13px;color:#aaa;">此对话使用了 Agent 模式，请选择重新生成的方式：</p>' +
+        '<div style="display:flex;flex-direction:column;gap:10px;">' +
+        '<button id="regen-normal-btn" style="padding:12px 16px;border:1px solid #555;border-radius:8px;background:transparent;color:inherit;cursor:pointer;font-size:14px;text-align:left;">💬 转换为普通对话模式</button>' +
+        '<button id="regen-agent-btn" style="padding:12px 16px;border:1px solid #7c5cbf;border-radius:8px;background:rgba(124,92,191,0.15);color:inherit;cursor:pointer;font-size:14px;text-align:left;">🔗 Agent 模式重新生成（重跑四阶段）</button>' +
+        '<button id="regen-cancel-btn" style="padding:8px 16px;border:none;border-radius:8px;background:transparent;color:#888;cursor:pointer;font-size:13px;">取消</button>' +
+        '</div>';
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // 取消时恢复原消息
+    function restoreMessages() {
+        var chatArea = document.getElementById('chat-area');
+        // 恢复 user 消息（插回到最后一条 user 消息的位置，或追加到末尾）
+        if (userMsg && userMsg.parentNode === null) {
+            var lastChild = chatArea.lastElementChild;
+            if (lastChild) {
+                chatArea.appendChild(userMsg);
+            } else {
+                chatArea.appendChild(userMsg);
+            }
+        }
+        // 恢复 assistant 消息（紧跟在 user 消息后面）
+        if (assistantMsg && assistantMsg.parentNode === null) {
+            if (userMsg && userMsg.parentNode) {
+                if (userMsg.nextSibling) {
+                    chatArea.insertBefore(assistantMsg, userMsg.nextSibling);
+                } else {
+                    chatArea.appendChild(assistantMsg);
+                }
+            } else {
+                chatArea.appendChild(assistantMsg);
+            }
+        }
+    }
+
+    // 按钮事件
+    document.getElementById('regen-normal-btn').addEventListener('click', function() {
+        overlay.remove();
+        if (assistantMsg) assistantMsg.remove();
+        if (userMsg) userMsg.remove();
+        // 创建新的 user 消息 div，转为普通模式
+        var newUserDiv = addUserMessage(text, filesJson);
+        if (newUserDiv) newUserDiv.dataset.chainMode = '0';
+        if (bridge) bridge.regenerate_as_normal(text, filesJson, '{}');
+    });
+    document.getElementById('regen-agent-btn').addEventListener('click', function() {
+        overlay.remove();
+        if (assistantMsg) assistantMsg.remove();
+        if (userMsg) userMsg.remove();
+        // 创建新的 user 消息 div，保持 Agent 模式
+        var newUserDiv = addUserMessage(text, filesJson);
+        if (newUserDiv) newUserDiv.dataset.chainMode = '1';
+        if (bridge) bridge.regenerate_as_agent(text, filesJson, '{}');
+    });
+    document.getElementById('regen-cancel-btn').addEventListener('click', function() {
+        overlay.remove();
+        restoreMessages();
+        enableSendButton();
+    });
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+            overlay.remove();
+            restoreMessages();
+            enableSendButton();
+        }
+    });
 }
 
 // 核心：addBlock - 按类型创建新块或追加到当前同类型块
@@ -225,6 +418,44 @@ function addBlock(type, text) {
             blockDiv.className = 'thinking-block';
             blockDiv.innerHTML = '<details class="thinking-details"><summary>思考过程</summary><div class="thinking-content"></div></details>';
             blockObj.contentElement = blockDiv.querySelector('.thinking-content');
+        } else if (type.indexOf('fold:') === 0) {
+            // 如果最后一个块已经是同标题的fold块，追加而非新建
+            var lastFoldBlock = null;
+            for (var fi = msgBlocks.length - 1; fi >= 0; fi--) {
+                if (msgBlocks[fi].type && msgBlocks[fi].type.indexOf('fold:') === 0) {
+                    lastFoldBlock = msgBlocks[fi];
+                    break;
+                }
+            }
+            if (lastFoldBlock && lastFoldBlock.type === type) {
+                lastFoldBlock.text += text;
+                lastFoldBlock.rawText += text;
+                if (lastFoldBlock.contentElement) {
+                    try { lastFoldBlock.contentElement.innerHTML = marked.parse(lastFoldBlock.rawText); } catch(e) { lastFoldBlock.contentElement.textContent = lastFoldBlock.rawText; }
+                }
+                autoScrollBottom(document.getElementById('chat-area'));
+                return;
+            }
+            blockIdCounter++;
+            var blockId = 'block-' + blockIdCounter;
+            if (!currentAssistantMsgDiv) {
+                var div = document.createElement('div');
+                div.className = 'message assistant';
+                div.innerHTML = '<div class="avatar">🤖</div><div class="content is-streaming"><span class="model-tag"></span><div class="assistant-output"></div></div>';
+                currentAssistantMsgDiv = div;
+                chatArea.appendChild(div);
+            }
+            var outputContainer = currentAssistantMsgDiv.querySelector('.assistant-output');
+            var blockDiv = document.createElement('div');
+            blockDiv.id = blockId;
+            blockDiv.className = 'fold-block';
+            var foldTitle = type.split(':')[1] || '详细内容';
+            blockDiv.innerHTML = '<details class="fold-details"><summary>' + foldTitle + '</summary><div class="fold-content"></div></details>';
+            var blockObj = { type: type, text: '', element: blockDiv, contentElement: blockDiv.querySelector('.fold-content'), rawText: '', foldTitle: foldTitle };
+            outputContainer.appendChild(blockDiv);
+            msgBlocks.push(blockObj);
+            currentBlockIndex = msgBlocks.length - 1;
+            currentBlockType = type;
         } else {
             blockDiv.className = 'assistant-text-block';
             blockDiv.innerHTML = '<div class="assistant-text"></div>';
@@ -246,17 +477,77 @@ function addBlock(type, text) {
             renderTimer = setTimeout(function() {
                 renderTimer = null;
                 if (block.contentElement) {
-                    block.contentElement.textContent = block.rawText;
-                    if (chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 100) chatArea.scrollTop = chatArea.scrollHeight;
+                    // 流式输出期间增量渲染 Markdown，而非显示原始语法
+                    try { block.contentElement.innerHTML = marked.parse(block.rawText); } catch(e) { block.contentElement.textContent = block.rawText; }
+                    // 移除 is-streaming 以使用正常 HTML 布局（而非 pre-wrap 等宽布局）
+                    var streamParent = block.contentElement.closest('.content.is-streaming');
+                    if (streamParent) streamParent.classList.remove('is-streaming');
+                    autoScrollBottom(chatArea);
+                }
+            }, RENDER_INTERVAL);
+        }
+    } else if (type.indexOf('fold:') === 0) {
+        // 折叠块也做增量 Markdown 渲染
+        block.rawText += text;
+        if (!foldRenderTimer) {
+            foldRenderTimer = setTimeout(function() {
+                foldRenderTimer = null;
+                if (block.contentElement) {
+                    try { block.contentElement.innerHTML = marked.parse(block.rawText); } catch(e) { block.contentElement.textContent = block.rawText; }
+                    autoScrollBottom(chatArea);
                 }
             }, RENDER_INTERVAL);
         }
     } else {
         if (block.contentElement) {
             block.contentElement.textContent += text;
-            if (chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 100) chatArea.scrollTop = chatArea.scrollHeight;
+            autoScrollBottom(chatArea);
         }
     }
+}
+
+// 直接添加折叠块（带标题和内容，一次性）
+function addFoldBlock(title, text) {
+    var chatArea = document.getElementById('chat-area');
+    if (!chatArea) return;
+    if (!currentAssistantMsgDiv) {
+        var div = document.createElement('div');
+        div.className = 'message assistant';
+        div.innerHTML = '<div class="avatar">🤖</div><div class="content is-streaming"><span class="model-tag"></span><div class="assistant-output"></div></div>';
+        currentAssistantMsgDiv = div;
+        chatArea.appendChild(div);
+    }
+    var outputContainer = currentAssistantMsgDiv.querySelector('.assistant-output');
+    blockIdCounter++;
+    var blockDiv = document.createElement('div');
+    blockDiv.id = 'block-' + blockIdCounter;
+    blockDiv.className = 'fold-block';
+    blockDiv.innerHTML = '<details class="fold-details"><summary>' + title + '</summary><div class="fold-content"></div></details>';
+    var contentEl = blockDiv.querySelector('.fold-content');
+    try { contentEl.innerHTML = marked.parse(text); } catch(e) { contentEl.textContent = text; }
+    outputContainer.appendChild(blockDiv);
+    msgBlocks.push({ type: 'fold', text: text, rawText: text, element: blockDiv, contentElement: contentEl, foldTitle: title });
+    currentBlockIndex = msgBlocks.length - 1;
+    currentBlockType = 'fold';
+    autoScrollBottom(chatArea);
+}
+
+// 替换指定标题的折叠块内容（用于todolist动态更新）
+function replaceFoldContent(title, newText) {
+    for (var i = msgBlocks.length - 1; i >= 0; i--) {
+        if (msgBlocks[i].foldTitle === title) {
+            var block = msgBlocks[i];
+            block.text = newText;
+            block.rawText = newText;
+            if (block.contentElement) {
+                try { block.contentElement.innerHTML = marked.parse(newText); } catch(e) { block.contentElement.textContent = newText; }
+            }
+            autoScrollBottom(document.getElementById('chat-area'));
+            return;
+        }
+    }
+    // 未找到匹配块，新建一个
+    addFoldBlock(title, newText);
 }
 
 // 兼容层：addThinking 委托给 addBlock
@@ -268,8 +559,7 @@ function addThinking(text) {
     var block = msgBlocks[currentBlockIndex];
     block.text += text;
     if (block.contentElement) block.contentElement.textContent += text;
-    var chatArea = document.getElementById('chat-area');
-    if (chatArea && chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 100) chatArea.scrollTop = chatArea.scrollHeight;
+    autoScrollBottom(document.getElementById('chat-area'));
 }
 
 // 兼容层：addContent 委托给 addBlock
@@ -284,9 +574,11 @@ function addContent(chunk) {
         renderTimer = setTimeout(function() {
             renderTimer = null;
             if (block.contentElement) {
-                block.contentElement.textContent = block.rawText;
-                var chatArea = document.getElementById('chat-area');
-                if (chatArea && chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 100) chatArea.scrollTop = chatArea.scrollHeight;
+                // 流式输出期间增量渲染 Markdown
+                try { block.contentElement.innerHTML = marked.parse(block.rawText); } catch(e) { block.contentElement.textContent = block.rawText; }
+                var streamParent2 = block.contentElement.closest('.content.is-streaming');
+                if (streamParent2) streamParent2.classList.remove('is-streaming');
+                autoScrollBottom(document.getElementById('chat-area'));
             }
         }, RENDER_INTERVAL);
     }
@@ -313,8 +605,22 @@ function addCopyButtons(container) {
     });
 }
 
+function toggleAllFolds(btn) {
+    var msgDiv = btn.closest('.message.assistant');
+    if (!msgDiv) return;
+    var allDetails = msgDiv.querySelectorAll('details.fold-details, details.thinking-details');
+    if (allDetails.length === 0) return;
+    // 判断当前状态：多数展开则折叠，多数折叠则展开
+    var openCount = 0;
+    allDetails.forEach(function(d) { if (d.open) openCount++; });
+    var shouldOpen = openCount <= allDetails.length / 2;
+    allDetails.forEach(function(d) { d.open = shouldOpen; });
+    btn.textContent = shouldOpen ? '📂 全部折叠' : '📂 全部展开';
+}
+
 function finishMessage(model) {
     if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+    if (foldRenderTimer) { clearTimeout(foldRenderTimer); foldRenderTimer = null; }
 
     // 渲染所有内容块为最终 Markdown（包括思考块）
     for (var i = 0; i < msgBlocks.length; i++) {
@@ -339,6 +645,15 @@ function finishMessage(model) {
             regenBtn.textContent = '🔄 重新生成';
             regenBtn.onclick = function(e) { e.stopPropagation(); regenerate(this); };
             actionsDiv.appendChild(regenBtn);
+            // 如果存在折叠块或思考块，添加一键折叠按钮
+            var hasFolds = outputEl && outputEl.querySelectorAll('.fold-block, .thinking-block').length > 0;
+            if (hasFolds) {
+                var foldBtn = document.createElement('button');
+                foldBtn.className = 'fold-all-btn';
+                foldBtn.textContent = '📂 全部折叠';
+                foldBtn.onclick = function(e) { e.stopPropagation(); toggleAllFolds(this); };
+                actionsDiv.appendChild(foldBtn);
+            }
             contentDiv.appendChild(actionsDiv);
         }
     }
@@ -350,7 +665,7 @@ function finishMessage(model) {
     currentRawText = "";
 
     var chatArea = document.getElementById('chat-area');
-    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+    if (chatArea) setProgramScroll(chatArea);
     enableSendButton();
 }
 
@@ -369,13 +684,13 @@ function addError(msg) {
     div.innerHTML = '<div class="avatar">⚠️</div>';
     div.appendChild(contentDiv);
     chatArea.appendChild(div);
-    chatArea.scrollTop = chatArea.scrollHeight;
+    setProgramScroll(chatArea);
 }
 
 // ====================================================================
 // 7. 历史记录加载 - 支持多块格式
 // ====================================================================
-function loadHistory(messages) {
+function loadHistory(messages, targetScrollTop) {
     clearMessages();
     var chatArea = document.getElementById('chat-area');
     if (!chatArea) return;
@@ -452,6 +767,21 @@ function loadHistory(messages) {
                         tempDiv.innerHTML = renderMarkdownFinal(block.text || '');
                         contentBlock.innerHTML = tempDiv.innerHTML;
                         actualDiv.appendChild(contentBlock);
+                    } else if (block.type === 'fold') {
+                        var foldBlock = document.createElement('div');
+                        foldBlock.className = 'fold-block';
+                        var foldTitle = block.foldTitle || '详细内容';
+                        var foldDet = document.createElement('details');
+                        foldDet.className = 'fold-details';
+                        foldDet.innerHTML = '<summary>' + foldTitle + '</summary>';
+                        var foldContent = document.createElement('div');
+                        foldContent.className = 'fold-content';
+                        var foldTmp = document.createElement('div');
+                        foldTmp.innerHTML = renderMarkdownFinal(block.text || '');
+                        while (foldTmp.firstChild) foldContent.appendChild(foldTmp.firstChild);
+                        foldDet.appendChild(foldContent);
+                        foldBlock.appendChild(foldDet);
+                        actualDiv.appendChild(foldBlock);
                     }
                 });
             } else {
@@ -484,10 +814,41 @@ function loadHistory(messages) {
             div.innerHTML = '<div class="avatar">🤖</div>'; div.appendChild(contentDiv);
             var actionsDiv = document.createElement('div'); actionsDiv.className = 'msg-actions';
             actionsDiv.innerHTML = '<button class="regen-btn" onclick="event.stopPropagation(); regenerate(this)">🔄 重新生成</button>';
+            // 如果存在折叠块或思考块，添加一键折叠按钮
+            if (actualDiv.querySelectorAll('.fold-block, .thinking-block').length > 0) {
+                var foldBtn = document.createElement('button');
+                foldBtn.className = 'fold-all-btn';
+                foldBtn.textContent = '📂 全部折叠';
+                foldBtn.onclick = function(e) { e.stopPropagation(); toggleAllFolds(this); };
+                actionsDiv.appendChild(foldBtn);
+            }
             contentDiv.appendChild(actionsDiv); chatArea.appendChild(div);
         }
     });
-    chatArea.scrollTop = chatArea.scrollHeight;
+    
+    // 智能滚动恢复：如果有目标位置则滚动到目标位置，否则滚动到底部
+    if (typeof targetScrollTop === 'number' && targetScrollTop > 0) {
+        // 延迟执行确保DOM完全渲染
+        setTimeout(function() {
+            if (chatArea) {
+                programScrolling = true;
+                if (programScrollTimer) clearTimeout(programScrollTimer);
+                chatArea.scrollTop = targetScrollTop;
+                programScrollTimer = setTimeout(function() {
+                    programScrolling = false;
+                    programScrollTimer = null;
+                }, 120);
+            }
+        }, 50);
+    } else {
+        setProgramScroll(chatArea);
+        // 延迟兑底：DOM 渲染（markdown/代码高亮）完成后 scrollHeight 才准确
+        setTimeout(function() { setProgramScroll(chatArea); }, 100);
+    }
+    // 强制重置视口，防止大内容导致整体偏移
+    resetViewport();
+    setTimeout(resetViewport, 100);
+    
     sendDisabled = false; document.getElementById('send-btn').disabled = false;
 }
 
@@ -495,7 +856,7 @@ function clearMessages() {
     if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
     var chatArea = document.getElementById('chat-area');
     if (chatArea) chatArea.innerHTML = '';
-    currentAssistantMsgDiv = null; currentRawText = "";
+    currentAssistantMsgDiv = null; currentRawText = '';
     msgBlocks = []; currentBlockIndex = -1; currentBlockType = null;
     sendDisabled = false; var sb = document.getElementById('send-btn'); if (sb) sb.disabled = false;
 }
@@ -731,6 +1092,7 @@ function send() {
 
     sendDisabled = true;
     document.getElementById('send-btn').disabled = true;
+    showStopButton();  // 显示停止按钮
     pendingInputText = text;
     var filesJson = JSON.stringify(Array.from(selectedFiles));
     lastUserMessageElem = addUserMessage(text, filesJson);
@@ -783,6 +1145,27 @@ function enableSendButton() {
     if (s) s.disabled = false;
     lastUserMessageElem = null;
     pendingInputText = '';
+    hideStopButton();  // 隐藏停止按钮
+}
+
+// 停止按钮显示/隐藏
+function showStopButton() {
+    var stopBtn = document.getElementById('stop-btn');
+    var sendBtn = document.getElementById('send-btn');
+    if (stopBtn) stopBtn.style.display = 'inline-flex';
+    if (sendBtn) sendBtn.style.display = 'none';
+}
+function hideStopButton() {
+    var stopBtn = document.getElementById('stop-btn');
+    var sendBtn = document.getElementById('send-btn');
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (sendBtn) sendBtn.style.display = '';
+}
+function stopGeneration() {
+    if (bridge && bridge.stop_generation) {
+        bridge.stop_generation();
+    }
+    hideStopButton();  // 点击后立即隐藏停止按钮
 }
 function onWallpaperSettingsClosed() { wallpaperDialogOpen = false; }
 
@@ -820,8 +1203,21 @@ function closeSummaryPanel() {
     if (panel) panel.classList.remove('open');
 }
 function setWallpaper(p, o) {
-    document.documentElement.style.setProperty('--wallpaper-path', 'url(' + p + ')');
-    document.documentElement.style.setProperty('--wallpaper-opacity', o);
+    var bg = document.getElementById('chat-background');
+    if (bg) {
+        if (!p || p === '' || p === "''" || p === 'url()') {
+            bg.style.backgroundImage = 'none';
+            bg.style.opacity = '0';
+        } else {
+            // 先清除再设置，强制重绘避免缓存
+            bg.style.backgroundImage = 'none';
+            void bg.offsetHeight;
+            bg.style.backgroundImage = 'url(' + p + ')';
+            bg.style.opacity = String(o);
+        }
+    }
+    document.documentElement.style.setProperty('--wallpaper-path', (!p || p === '') ? 'none' : 'url(' + p + ')');
+    document.documentElement.style.setProperty('--wallpaper-opacity', (!p || p === '') ? '0' : String(o));
 }
 function showModelTag(model) {
     var bar = document.getElementById('model-bar'); if (!bar) return;
@@ -864,7 +1260,7 @@ function initResizers() {
 // 11. Markdown 渲染
 // ====================================================================
 function renderMarkdown(text) { return marked.parse(text); }
-function renderMarkdownFinal(text) { var html=marked.parse(text); var tmp=document.createElement('div'); tmp.innerHTML=html; tmp.querySelectorAll('pre code').forEach(function(b){hljs.highlightElement(b)}); return tmp.innerHTML; }
+function renderMarkdownFinal(text) { return marked.parse(text); }
 
 // ====================================================================
 // 11.5 对话配置面板 & 思维链模式
@@ -880,13 +1276,24 @@ function populatePlatforms() {
     });
 }
 function showConfigPanel() {
-    var panel = document.getElementById('conv-config-panel');
-    if (panel) panel.style.display = 'block';
+    var overlay = document.getElementById('conv-config-overlay');
+    if (overlay) overlay.style.display = 'flex';
     populatePlatforms();
+    // 重置表单
+    var cb = document.getElementById('cfg-independent-model');
+    if (cb) cb.checked = false;
+    var cb2 = document.getElementById('cfg-chain-mode');
+    if (cb2) cb2.checked = false;
+    var detail = document.getElementById('config-model-detail');
+    if (detail) detail.style.display = 'none';
+    var sp = document.getElementById('cfg-system-prompt');
+    if (sp) sp.value = '';
+    var mi = document.getElementById('cfg-model');
+    if (mi) mi.value = '';
 }
 function hideConfigPanel() {
-    var panel = document.getElementById('conv-config-panel');
-    if (panel) panel.style.display = 'none';
+    var overlay = document.getElementById('conv-config-overlay');
+    if (overlay) overlay.style.display = 'none';
 }
 function toggleIndependentModel() {
     var cb = document.getElementById('cfg-independent-model');
@@ -901,7 +1308,7 @@ function getConvConfig() {
     var independentModel = false;
     var cb = document.getElementById('cfg-independent-model');
     if (cb) independentModel = cb.checked;
-    var platform = '', model = '', memRounds = 50, maxTokens = 65536;
+    var platform = '', model = '', memRounds = 50, maxTokens = 65536, temperature = 0.7;
     if (independentModel) {
         var ps = document.getElementById('cfg-platform');
         if (ps) platform = ps.value;
@@ -911,12 +1318,23 @@ function getConvConfig() {
         if (mr) memRounds = parseInt(mr.value) || 50;
         var mt = document.getElementById('cfg-max-tokens');
         if (mt) maxTokens = parseInt(mt.value) || 65536;
+        var temp = document.getElementById('cfg-temperature');
+        if (temp) temperature = parseFloat(temp.value) || 0.7;
     }
+    var systemPrompt = '';
+    var sp = document.getElementById('cfg-system-prompt');
+    if (sp) systemPrompt = sp.value.trim();
+    var modeSelect = document.getElementById('agent-mode-select');
+    var agentMode = 'code';
+    if (modeSelect) agentMode = modeSelect.value;
     return {
         independentModel: independentModel,
         platform: platform, model: model,
         memRounds: memRounds, maxTokens: maxTokens,
-        chainMode: chainModeEnabled
+        temperature: temperature,
+        chainMode: chainModeEnabled,
+        systemPrompt: systemPrompt,
+        agentMode: chainModeEnabled ? agentMode : ''
     };
 }
 function updateChainProgress(status, tasklistJson) {
@@ -938,6 +1356,10 @@ function updateChainProgress(status, tasklistJson) {
             else if (t.status === 'active') { cls += 'task-active'; icon = '▶'; }
             else { cls += 'task-pending'; }
             item.className = cls;
+            // 支持缩进（子任务）
+            var indent = t.indent || 0;
+            var indentStyle = indent > 0 ? 'padding-left:' + (indent * 20 + 8) + 'px;' : '';
+            item.style.cssText = indentStyle;
             item.innerHTML = '<span class="task-icon">' + icon + '</span><span>' + t.text + '</span>';
             listEl.appendChild(item);
         });
@@ -953,6 +1375,24 @@ function setChainMode(active) {
     var cb = document.getElementById('cfg-chain-mode');
     if (cb) cb.checked = !!active;
 }
+function setConvConfig(indepEnabled, platform, model, memRounds, maxTokens, temperature, chainMode, systemPrompt) {
+    var cb = document.getElementById('cfg-independent-model');
+    if (cb) cb.checked = !!indepEnabled;
+    var ps = document.getElementById('cfg-platform');
+    if (ps && platform) ps.value = platform;
+    var mi = document.getElementById('cfg-model');
+    if (mi) mi.value = model || '';
+    var mr = document.getElementById('cfg-memory-rounds');
+    if (mr) mr.value = memRounds || 50;
+    var mt = document.getElementById('cfg-max-tokens');
+    if (mt) mt.value = maxTokens || 65536;
+    var temp = document.getElementById('cfg-temperature');
+    if (temp) temp.value = temperature || 0.7;
+    var spp = document.getElementById('cfg-system-prompt');
+    if (spp) spp.value = systemPrompt || '';
+    setChainMode(!!chainMode);
+    toggleIndependentModel();
+}
 
 // ====================================================================
 // 12. 初始化
@@ -961,6 +1401,8 @@ function initialize() {
     initResizers();
     var sendBtn = document.getElementById('send-btn');
     if (sendBtn) sendBtn.addEventListener('click', send);
+    var stopBtn = document.getElementById('stop-btn');
+    if (stopBtn) stopBtn.addEventListener('click', stopGeneration);
     var loadFolderBtn = document.getElementById('load-folder-btn');
     if (loadFolderBtn) loadFolderBtn.addEventListener('click', loadFolder);
     var settingsBtn = document.getElementById('settings-btn');
@@ -985,8 +1427,24 @@ function initialize() {
     if (toggleSummaryBtn) toggleSummaryBtn.addEventListener('click', openSummaryPanel);
     var summaryCloseBtn = document.getElementById('summary-close-btn');
     if (summaryCloseBtn) summaryCloseBtn.addEventListener('click', closeSummaryPanel);
-    var configCollapseBtn = document.getElementById('config-collapse-btn');
-    if (configCollapseBtn) configCollapseBtn.addEventListener('click', hideConfigPanel);
+    var configCloseBtn = document.getElementById('config-dialog-close');
+    if (configCloseBtn) configCloseBtn.addEventListener('click', hideConfigPanel);
+    var configCancelBtn = document.getElementById('config-cancel-btn');
+    if (configCancelBtn) configCancelBtn.addEventListener('click', hideConfigPanel);
+    var configConfirmBtn = document.getElementById('config-confirm-btn');
+    if (configConfirmBtn) configConfirmBtn.addEventListener('click', confirmNewConvConfig);
+    // 点击遮罩关闭
+    var configOverlay = document.getElementById('conv-config-overlay');
+    if (configOverlay) configOverlay.addEventListener('click', function(e) {
+        if (e.target === configOverlay) hideConfigPanel();
+    });
+    // Escape 关闭模态框
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            var overlay = document.getElementById('conv-config-overlay');
+            if (overlay && overlay.style.display === 'flex') hideConfigPanel();
+        }
+    });
     var cfgIndepModel = document.getElementById('cfg-independent-model');
     if (cfgIndepModel) cfgIndepModel.addEventListener('change', toggleIndependentModel);
     var cfgChainMode = document.getElementById('cfg-chain-mode');
@@ -1001,6 +1459,45 @@ function initialize() {
     if (folderPathInput) folderPathInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); loadFolder(); } });
     var userInput = document.getElementById('user-input');
     if (userInput) userInput.addEventListener('keydown', function(e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } });
+    // 滚动条修复：区分程序触发的滚动和用户手动滚动
+    // programScrolling 为 true 时忽略 scroll 事件，避免自动滚底被误判为用户滚动
+    var chatAreaEl = document.getElementById('chat-area');
+    if (chatAreaEl) {
+        chatAreaEl.addEventListener('scroll', function() {
+            if (programScrolling) return;  // 程序触发的滚动，忽略
+            userScrolling = true;
+            if (scrollCheckTimer) clearTimeout(scrollCheckTimer);
+            scrollCheckTimer = setTimeout(function() {
+                userScrolling = false;
+            }, 800);
+        });
+    }
+    // 模式选择器：恢复上次选择 + 变更时记忆
+    var modeSelect = document.getElementById('agent-mode-select');
+    if (modeSelect) {
+        try {
+            var savedMode = localStorage.getItem('agentMode');
+            if (savedMode) modeSelect.value = savedMode;
+        } catch(e) {}
+        modeSelect.addEventListener('change', function() {
+            try { localStorage.setItem('agentMode', this.value); } catch(e) {}
+        });
+    }
+    // 强制重置视口，防止大内容导致整体偏移
+    resetViewport();
+    setTimeout(resetViewport, 100);
+    window.addEventListener('resize', resetViewport);
+    
     attemptConnection();
+}
+function resetViewport() {
+    if (document.documentElement) {
+        document.documentElement.scrollTop = 0;
+        document.documentElement.scrollLeft = 0;
+    }
+    if (document.body) {
+        document.body.scrollTop = 0;
+        document.body.scrollLeft = 0;
+    }
 }
 window.addEventListener('load', initialize);

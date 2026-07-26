@@ -1,11 +1,12 @@
 import os
 from typing import Dict
 
+# 统一转为小写集合，实现大小写不敏感的过滤（Windows 兼容）
 IGNORE_DIRS = {
     "__pycache__", ".git", ".svn", ".hg", "node_modules",
     "env", "venv", ".env", ".venv", "runtime",
     ".idea", ".vs", ".vscode", "dist", "build",
-    ".gradle", ".mvn", "target", ".DS_Store",
+    ".gradle", ".mvn", "target", ".ds_store",
 }
 
 def get_file_tree(folder_path: str) -> Dict:
@@ -21,7 +22,8 @@ def get_file_tree(folder_path: str) -> Dict:
             except PermissionError:
                 items = []
             for item in items:
-                if item in IGNORE_DIRS:
+                # 大小写不敏感：将目录名转为小写后再比对
+                if item.lower() in IGNORE_DIRS:
                     continue
                 full = os.path.join(path, item)
                 children.append(_build(full))

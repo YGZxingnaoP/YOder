@@ -28,6 +28,8 @@ __pycache__/
 build/
 dist/
 *.spec
+icon.ico
+.pip_cache/
 
 # 操作系统生成文件
 .DS_Store

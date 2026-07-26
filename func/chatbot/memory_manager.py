@@ -111,6 +111,26 @@ def save_agent_config(folder_name: str, config: Dict):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
+def load_system_prompt(folder_name: str) -> str:
+    """加载对话的系统提示词，返回空字符串表示未设置"""
+    path = os.path.join(_conv_dir(folder_name), "system_prompt.json")
+    if not os.path.exists(path):
+        return ""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f).get("system_prompt", "")
+    except Exception:
+        return ""
+
+
+def save_system_prompt(folder_name: str, prompt: str):
+    """保存对话的系统提示词"""
+    d = _conv_dir(folder_name)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "system_prompt.json"), "w", encoding="utf-8") as f:
+        json.dump({"system_prompt": prompt}, f, ensure_ascii=False, indent=2)
+
+
 # ═══════════════════════════════════════════════════
 #  内部工具
 # ═══════════════════════════════════════════════════
