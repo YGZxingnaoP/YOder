@@ -15,7 +15,7 @@ from .taskchunks.file_reader import build_file_map
 from .taskchunks.history_builder import build_history_text, build_brief_history
 from .taskchunks.output_manager import OutputManager
 from .taskchunks.task_manager import build_tasklist_for_ui
-from .taskchunks.phase1_framework import run_phase1, run_task_review
+from .taskchunks.phase1_framework import run_phase1, run_task_review, run_framework_review
 from .taskchunks.phase2_filler import run_phase2
 from .taskchunks.phase3_review import run_phase3
 from .agent_prompts import PRINCIPLE_CODE_SYSTEM, PRINCIPLE_GENERAL_SYSTEM, PRINCIPLE_USER
@@ -314,6 +314,30 @@ def run_agent_pipeline(
             )
             return len(redo_result.failed_tasks) == 0
 
+        def _redo_framework() -> bool:
+            """
+            重建整个框架（阶段三审查发现框架本身不合理时调用）。
+            重新运行框架构建 + 任务审查，然后重新执行所有 task 的填充。
+            """
+            return run_framework_review(
+                client=client,
+                model=model,
+                platform=platform,
+                user_message=user_message,
+                selected_files=selected_files,
+                root_path=root_path,
+                history_text=history_text,
+                system_prompt=system_prompt,
+                output_mgr=output_mgr,
+                extra_body=get_extra_body(platform, thinking_level),
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stream_callback=stream_callback,
+                thinking_callback=_named_think("阶段三思考：框架重建"),
+                progress_callback=progress_callback,
+                stop_check=user_stop_check,
+            )
+
         phase3_result = run_phase3(
             client=client,
             model=model,
@@ -331,6 +355,7 @@ def run_agent_pipeline(
             progress_callback=progress_callback,
             phase2_runner=_redo_single_task,
             coordinated_runner=_coordinated_redo_all,
+            framework_runner=_redo_framework,
             stop_check=user_stop_check,
         )
 

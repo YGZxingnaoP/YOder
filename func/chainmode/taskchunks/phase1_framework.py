@@ -409,3 +409,129 @@ def run_task_review(
         from .task_manager import build_tasklist_for_ui
         tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
         progress_callback("阶段一 Part III 完成：任务定义已确认", tasklist)
+
+
+def run_framework_review(
+    client,
+    model: str,
+    platform: str,
+    user_message: str,
+    selected_files: list,
+    root_path: str,
+    history_text: str,
+    system_prompt: str,
+    output_mgr: OutputManager,
+    extra_body: dict,
+    max_tokens: int = 65536,
+    temperature: float = 0.7,
+    stream_callback: Optional[Callable] = None,
+    thinking_callback: Optional[Callable] = None,
+    progress_callback: Optional[Callable] = None,
+    stop_check: Optional[Callable] = None,
+) -> bool:
+    """
+    框架审查重建：重新运行框架构建（Part II）和任务审查（Part III）。
+    当阶段三审查认为框架本身不合理时调用。
+
+    Returns:
+        bool: True 表示重建成功
+    """
+    if progress_callback:
+        progress_callback("阶段三：重建框架", [])
+
+    # 重新读取文件内容
+    full_file_content = ""
+    file_list_text = ""
+    for fpath in selected_files:
+        if os.path.isfile(fpath):
+            relpath = os.path.relpath(fpath, root_path) if root_path else fpath
+            content = read_file_full(fpath)
+            full_file_content += f"\n### 文件: {relpath}\n```\n{content}\n```\n"
+            file_list_text += f"- {relpath}\n"
+    if not file_list_text:
+        file_list_text = "(未选择文件)"
+
+    # 重新构建框架（与 Part II 相同逻辑）
+    fw_sys_msg = PHASE1_FRAMEWORK_SYSTEM
+    if system_prompt:
+        fw_sys_msg = f"{system_prompt}\n\n---\n\n{fw_sys_msg}"
+
+    fw_messages = [
+        {"role": "system", "content": fw_sys_msg},
+        {"role": "user", "content": PHASE1_FRAMEWORK_USER.format(
+            user_message=user_message,
+            file_list=file_list_text,
+            file_contents=full_file_content if full_file_content else "(未选择文件)",
+            history=history_text,
+        )}
+    ]
+
+    def _fw_stream(type_, content):
+        if stream_callback:
+            if type_ == "content":
+                stream_callback("fold:阶段三框架重建", content)
+            else:
+                stream_callback(type_, content)
+
+    def _fw_think(content):
+        if thinking_callback:
+            thinking_callback(content)
+
+    framework_response = call_api(
+        client, model, fw_messages,
+        callback=_fw_stream,
+        thinking_callback=_fw_think,
+        extra_body=extra_body,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        stop_check=stop_check,
+    )
+
+    # 解析新框架
+    framework_text, tasks = _parse_framework_output(framework_response)
+
+    # 更新 output_mgr 中的框架和 tasks
+    output_mgr.set_framework(framework_text)
+    current_tasks = output_mgr.get_all_tasks()
+    for tid, task_data in tasks.items():
+        if tid in current_tasks:
+            # 保留已有 task 的已有字段，更新描述/文件/要求
+            output_mgr.update_task(
+                tid,
+                description=task_data.get("description", current_tasks[tid].get("description", "")),
+                files=task_data.get("files", current_tasks[tid].get("files", [])),
+                requirements=task_data.get("requirements", current_tasks[tid].get("requirements", "")),
+                preset=task_data.get("preset", current_tasks[tid].get("preset", "mixed")),
+            )
+        else:
+            # 新 task
+            output_mgr.update_task(tid, **task_data)
+
+    if progress_callback:
+        tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
+        progress_callback("阶段三：框架已重建，进行任务审查", tasklist)
+
+    # 重新运行任务审查
+    run_task_review(
+        client=client,
+        model=model,
+        platform=platform,
+        user_message=user_message,
+        file_list_text=file_list_text,
+        history_text=history_text,
+        system_prompt=system_prompt,
+        output_mgr=output_mgr,
+        extra_body=extra_body,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        stream_callback=stream_callback,
+        thinking_callback=thinking_callback,
+        progress_callback=progress_callback,
+        stop_check=stop_check,
+    )
+
+    if progress_callback:
+        tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
+        progress_callback("阶段三：框架重建完成", tasklist)
+
+    return True

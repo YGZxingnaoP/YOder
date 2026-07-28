@@ -300,6 +300,7 @@ function regenerate(btn) {
     var isChainMode = userMsg.dataset.chainMode === '1';
     sendDisabled = true;
     document.getElementById('send-btn').disabled = true;
+    showStopButton();
     if (isChainMode) {
         // Agent 模式：弹出选择对话框（先不删除消息，取消时保留）
         showRegenerateDialog(userMsg.dataset.text, userMsg.dataset.files, userMsg, assistantMsg);
@@ -371,6 +372,7 @@ function showRegenerateDialog(text, filesJson, userMsg, assistantMsg) {
         // 创建新的 user 消息 div，转为普通模式
         var newUserDiv = addUserMessage(text, filesJson);
         if (newUserDiv) newUserDiv.dataset.chainMode = '0';
+        showStopButton();
         if (bridge) bridge.regenerate_as_normal(text, filesJson, '{}');
     });
     document.getElementById('regen-agent-btn').addEventListener('click', function() {
@@ -380,6 +382,7 @@ function showRegenerateDialog(text, filesJson, userMsg, assistantMsg) {
         // 创建新的 user 消息 div，保持 Agent 模式
         var newUserDiv = addUserMessage(text, filesJson);
         if (newUserDiv) newUserDiv.dataset.chainMode = '1';
+        showStopButton();
         if (bridge) bridge.regenerate_as_agent(text, filesJson, '{}');
     });
     document.getElementById('regen-cancel-btn').addEventListener('click', function() {
