@@ -592,7 +592,8 @@ class Bridge(QObject):
             # 先加载历史（在保存当前消息之前，避免当前用户消息重复出现在上下文中）
             mem_rounds = self.client.config.get("memory_rounds", 50)
             history = load_memory(self.current_folder, mem_rounds, force_use_summary=force_use_summary)
-            messages, ui_content = build_message_list("You are a helpful assistant.", text, history, files, self.current_path)
+            system_prompt = load_system_prompt(self.current_folder) or "You are a helpful assistant."
+            messages, ui_content = build_message_list(system_prompt, text, history, files, self.current_path)
 
             self.current_messages.append({"role": "user", "raw_text": text, "files": files, "content": ui_content, "chain_mode": False})
             self.current_messages.append({"role": "assistant", "thinking": "", "content": "", "blocks": []})
@@ -1078,6 +1079,9 @@ class Bridge(QObject):
             index = int(index_str)
         except:
             return
+        # 从文件重新加载，确保 current_messages 与磁盘一致
+        if self.current_folder:
+            self.current_messages = load_conversation(self.current_folder)
         if index < 0 or index >= len(self.current_messages) or self.current_messages[index]['role'] != 'user':
             return
         
@@ -1086,8 +1090,6 @@ class Bridge(QObject):
             self.current_messages.pop(index)
         if self.current_folder:
             save_conversation(self.current_folder, self.current_messages)
-        # 重新加载历史记录并滚动到底部
-        self._run_js(f"loadHistory({json.dumps(self.current_messages)}, null)")
 
     def _on_stream(self, type_, content):
         if type_ == "thinking":

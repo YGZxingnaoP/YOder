@@ -87,9 +87,15 @@ function setProgramScroll(el) {
 
 // 自动滚到底部（流式输出时尊重用户滚动，不强制拽回）
 function autoScrollBottom(el) {
-    if (!el || userScrolling) return;
-    if (el.scrollHeight > el.clientHeight) {
-        setProgramScroll(el);
+    if (!el) return;
+    // 如果用户主动滚动上去了（不在底部附近），不强制拽回
+    if (userScrolling) return;
+    // 检查是否在底部附近（200px 阈值，允许小幅内容增长不触发用户滚动标志）
+    var distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 200) {
+        if (el.scrollHeight > el.clientHeight) {
+            setProgramScroll(el);
+        }
     }
 }
 
@@ -1465,11 +1471,17 @@ function initialize() {
     if (chatAreaEl) {
         chatAreaEl.addEventListener('scroll', function() {
             if (programScrolling) return;  // 程序触发的滚动，忽略
-            userScrolling = true;
-            if (scrollCheckTimer) clearTimeout(scrollCheckTimer);
-            scrollCheckTimer = setTimeout(function() {
+            // 检查用户是否滚动到底部附近（30px 阈值）
+            var isNearBottom = (chatAreaEl.scrollHeight - chatAreaEl.scrollTop - chatAreaEl.clientHeight) < 30;
+            if (isNearBottom) {
+                // 用户滚动到底部，重置标志，允许自动滚底
                 userScrolling = false;
-            }, 800);
+                if (scrollCheckTimer) clearTimeout(scrollCheckTimer);
+            } else {
+                // 用户不在底部，标记为正在滚动
+                userScrolling = true;
+                if (scrollCheckTimer) clearTimeout(scrollCheckTimer);
+            }
         });
     }
     // 模式选择器：恢复上次选择 + 变更时记忆
