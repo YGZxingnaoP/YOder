@@ -1076,18 +1076,32 @@ class Bridge(QObject):
         if self._stream_active:
             return
         try:
-            index = int(index_str)
+            user_index = int(index_str)
         except:
             return
         # 从文件重新加载，确保 current_messages 与磁盘一致
         if self.current_folder:
             self.current_messages = load_conversation(self.current_folder)
-        if index < 0 or index >= len(self.current_messages) or self.current_messages[index]['role'] != 'user':
+        
+        # 前端传递的是「第 N 个 user 消息」的序号，需要映射到 current_messages 中的实际位置
+        # current_messages 是 user/assistant 交错的，不能直接用 user_index 作为数组下标
+        user_count = -1
+        target_index = -1
+        for i, msg in enumerate(self.current_messages):
+            if msg.get('role') == 'user':
+                user_count += 1
+                if user_count == user_index:
+                    target_index = i
+                    break
+        
+        if target_index < 0:
             return
         
-        self.current_messages.pop(index)
-        if index < len(self.current_messages) and self.current_messages[index]['role'] == 'assistant':
-            self.current_messages.pop(index)
+        # 移除 user 消息
+        self.current_messages.pop(target_index)
+        # 移除紧随其后的 assistant 消息（如果存在）
+        if target_index < len(self.current_messages) and self.current_messages[target_index].get('role') == 'assistant':
+            self.current_messages.pop(target_index)
         if self.current_folder:
             save_conversation(self.current_folder, self.current_messages)
 
