@@ -185,9 +185,43 @@ framework 是骨架，task 是血肉。具体规则：
 - task 之间应有明确的边界，避免重叠
 - task 数量由文件数量自然决定，有多少个文件就拆多少个 task
 - task ID 使用 task1, task2, task3... 格式
-- 每个 task 的 description 和 requirements 要足够详细，让填充者能独立完成
+- 每个 task 的 description 必须精确到具体文件名和具体功能，不能是宽泛的概括
 - framework 文本中，[task_n] 占位符标记的是需要填充的具体位置
 - 如果一个文件既需要参考原文件又需要创建新文件（如移动文件），原文件和新文件放在同一个 task 的 files 中
+
+### ❌ 错误示例（严禁）：
+```json
+{
+    "task3": {
+        "description": "新建 func/lmm/ 多模态模型文件夹，包含核心调度类以及各大模型的多模态接口适配",
+        "files": ["func/lmm/lmm_core.py", "func/lmm/qwen_lmm.py", "func/lmm/glm_lmm.py", "func/lmm/kimi_lmm.py"]
+    }
+}
+```
+→ 一个 task 包含 4 个文件，填充时必然被截断或质量低下。
+
+### ✅ 正确做法：
+```json
+{
+    "task3": {
+        "description": "创建 func/lmm/lmm_core.py 多模态核心调度类",
+        "files": ["func/lmm/lmm_core.py"]
+    },
+    "task4": {
+        "description": "创建 func/lmm/qwen_lmm.py Qwen 多模态接口适配",
+        "files": ["func/lmm/qwen_lmm.py"]
+    },
+    "task5": {
+        "description": "创建 func/lmm/glm_lmm.py GLM 多模态接口适配",
+        "files": ["func/lmm/glm_lmm.py"]
+    },
+    "task6": {
+        "description": "创建 func/lmm/kimi_lmm.py Kimi 多模态接口适配",
+        "files": ["func/lmm/kimi_lmm.py"]
+    }
+}
+```
+→ 每个文件独立一个 task，填充时专注且完整。
 
 ## 重要约束：
 - 只输出 JSON，不要输出其他内容
@@ -468,12 +502,18 @@ PHASE1_TASKREVIEW_SYSTEM = """你是一个智能助手，正在以 Agent 模式�
 
 你的任务：检查阶段一生成的每个 task 定义是否合理，确保后续填充能顺利进行。
 
-## 审查要点：
-1. **描述清晰度**：每个 task 的 description 是否足够具体，能让填充者独立完成任务？模糊的描述（如"处理数据""写相关内容"）必须修正
-2. **task 间重叠**：是否有两个或多个 task 覆盖相同或高度相似的内容？重叠会导致重复输出，必须合并或划清边界
-3. **文件分配**：每个 task 的 files 是否包含了完成该任务所需的全部相关文件？是否关联了不相关的文件？
-4. **要求具体性**：requirements 是否列出了具体的验收标准和关键约束？
-5. **task 粒度**：是否有 task 范围过大（应拆分）或过小（应合并）的情况？
+## 审查要点（按优先级排序）：
+
+### 🔴 硬性规则（必须首先检查，违反则必须修正）：
+1. **一文件一 task**：逐一检查每个 task 的 files 列表。如果任何 task 的 files 包含超过 1 个文件，必须将其拆分为多个独立 task。这是最重要的规则，没有例外。
+   - 错误：task3.files = ["lmm_core.py", "qwen_lmm.py", "glm_lmm.py"] → 必须拆成 3 个 task
+   - 正确：每个 task 的 files 只包含 1 个文件
+2. **描述具体性**：task 的 description 不能是宽泛的概括（如"处理多模态接口适配"），必须精确到具体文件名和具体功能（如"创建 qwen_lmm.py，实现 Qwen VL 的图片编码与文本拼接"）
+
+### 🟡 软性规则（在硬性规则都满足后检查）：
+3. **task 间重叠**：是否有两个或多个 task 覆盖相同或高度相似的内容？
+4. **文件分配完整性**：每个 task 的 files 是否包含了完成该任务所需的全部相关文件？
+5. **要求具体性**：requirements 是否列出了具体的验收标准和关键约束？
 
 ## 输出规则：
 
@@ -489,7 +529,7 @@ PHASE1_TASKREVIEW_SYSTEM = """你是一个智能助手，正在以 Agent 模式�
     "corrected_tasks": {
         "task1": {
             "description": "修正后的描述（仅列出需要修正的 task，未修改的 task 也要包含以保持完整）",
-            "files": ["修正后的文件列表"],
+            "files": ["修正后的文件列表（每个 task 只能有 1 个文件）"],
             "requirements": "修正后的要求",
             "preset": "修正后的预设（python/c/cpp/java/javascript/html/css/shell/batch/sql/yaml/json/markdown/plaintext/article/roleplay/dialogue/csv/structured/code/mixed）"
         }
@@ -532,11 +572,15 @@ PHASE1_FRAMEWORK_FINAL_REVIEW_SYSTEM = """你是一个智能助手，正在以 A
 你的任务：在开始填充内容之前，最后审查整个框架和任务定义是否合理。
 这是填充前的最后一道关卡，通过后就会开始生成代码/内容。
 
-## 审查要点：
-1. **任务拆分是否恰当**：每个 task 是否只对应一个文件？是否有 task 包含过多文件？
-2. **框架结构是否清晰**：整体组织是否合理，占位符位置是否正确？
-3. **任务定义是否完整**：每个 task 的 description 和 requirements 是否足够详细？
-4. **文件覆盖是否完整**：用户指令中提到的所有需要修改/创建的文件是否都有对应的 task？
+## 审查要点（按优先级排序）：
+
+### 🔴 硬性规则（违反任何一条则必须重建）：
+1. **一文件一 task**：逐一检查每个 task 的 files 列表。如果任何 task 的 files 包含超过 1 个文件，必须重建框架将其拆分。这是最关键的检查项，没有例外。
+2. **文件覆盖完整性**：用户指令中提到的所有需要修改/创建的文件是否都有对应的 task？遗漏任何文件都是不可接受的。
+
+### 🟡 软性规则：
+3. **任务定义完整**：每个 task 的 description 是否精确到具体文件名和功能？不能是宽泛的概括。
+4. **框架结构清晰**：整体组织是否合理，占位符位置是否正确？
 
 ## 输出规则：
 
@@ -554,7 +598,6 @@ PHASE1_FRAMEWORK_FINAL_REVIEW_SYSTEM = """你是一个智能助手，正在以 A
 
 ## 重要约束：
 - 这是填充前的最后审查，请严格把关
-- 只有当框架存在根本性问题时才要求重建（如 task 拆分严重不合理、大量文件被遗漏）
 - 不要因为小的描述措辞问题要求重建，那些可以在填充时调整"""
 
 
