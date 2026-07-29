@@ -109,17 +109,28 @@ class OutputManager:
         # 替换框架中的占位符
         placeholder = f"[{task_id}]"
         if placeholder in data["framework"]:
-            # 根据 preset 类型自动包裹代码围栏
-            task = data["tasks"].get(task_id, {})
-            display_content = self._get_display_content(task)
-            replacement = display_content
-            # 如果内容是多行或含代码块，且占位符处于行内位置（前面有非空白字符），
-            # 在内容前添加换行，避免代码块紧跟在行内文字后面导致 markdown 渲染异常
-            if ('\n' in display_content or '```' in display_content):
-                pattern = r'(\S)([ \t]*)' + re.escape(placeholder)
-                match = re.search(pattern, data["framework"])
-                if match:
-                    replacement = '\n' + display_content
+            # 检测占位符是否在框架已有的代码围栏内
+            # AI 生成的框架模板常自带 ```python 围栏，此时不应再叠加围栏
+            inside_fence = self._is_placeholder_inside_fence(
+                data["framework"], placeholder
+            )
+            if inside_fence:
+                # 框架已有围栏，直接使用原始内容，避免双重围栏
+                replacement = content
+                data["tasks"][task_id]["_filled_as_raw"] = True
+            else:
+                # 框架无围栏，根据 preset 自动包裹
+                task = data["tasks"].get(task_id, {})
+                display_content = self._get_display_content(task)
+                replacement = display_content
+                data["tasks"][task_id]["_filled_as_raw"] = False
+                # 如果内容是多行或含代码块，且占位符处于行内位置，
+                # 在内容前添加换行，避免代码块紧跟在行内文字后面
+                if ('\n' in display_content or '```' in display_content):
+                    pattern = r'(\S)([ \t]*)' + re.escape(placeholder)
+                    match = re.search(pattern, data["framework"])
+                    if match:
+                        replacement = '\n' + display_content
             data["framework"] = data["framework"].replace(placeholder, replacement)
             # 去重兆底：消除替换后产生的连续重复标题行
             data["framework"] = self._dedup_headings(data["framework"])
@@ -146,6 +157,20 @@ class OutputManager:
                     prev_heading = None
             result.append(line)
         return '\n'.join(result)
+
+    @staticmethod
+    def _is_placeholder_inside_fence(text: str, placeholder: str) -> bool:
+        """
+        检测占位符在框架文本中是否位于已有的代码围栏内。
+        通过计算占位符位置之前的未配对 ``` 数量判断：
+        奇数表示在围栏内，偶数表示在围栏外。
+        """
+        pos = text.find(placeholder)
+        if pos < 0:
+            return False
+        before = text[:pos]
+        count = before.count('```')
+        return count % 2 == 1
 
     def restore_task_placeholder(self, task_id: str):
         """恢复 task 在框架中的占位符（用于重做前）"""
@@ -196,17 +221,16 @@ class OutputManager:
 
         tasks = data.get("tasks", {})
 
+        # ── 清理：消除嵌套代码围栏 ──
+        # 旧版代码可能在框架文本中产生了双重围栏（框架模板自带 + fill_task 叠加），
+        # 或者在整个框架外层包裹了统一围栏。
+        # 此步骤先剥离外层围栏，再消除双重围栏，确保每个代码块只有一层围栏。
+        output = self._clean_nested_fences(output, tasks)
+
         # ── 后处理：修正内联多行内容的格式问题 ──
-        # fill_task() 已对新的填充做了修正，但对历史数据（框架中占位符已替换、
-        # 多行内容仍然内联）需要再处理一次。
-        # 策略：将已填充的内容临时还原为占位符 → 修正占位符位置 → 重新替换回内容
         output = self._fix_inline_multiline(output, tasks)
 
-        # ── 合并同预设代码围栏 ──
-        # 当所有已填充的父级 task 使用相同的代码类预设时，Phase 1 框架中的
-        # 非占位符部分（如 import 语句、Flask 配置）不会被代码围栏包裹，
-        # 导致 markdown 渲染时这些代码显示为普通文本。
-        # 此步骤将整个框架合并为一个代码围栏，确保所有代码正确渲染。
+        # ── 合并同预设代码围栏（仅在框架无围栏时才包裹） ──
         output = self._merge_same_preset_fences(output, tasks)
 
         # ── 添加生成的文件列表 ──
@@ -224,6 +248,56 @@ class OutputManager:
             output += f"\n\n---\n## 📁 生成的文件\n\n{file_list_lines}"
 
         return output
+
+    @staticmethod
+    def _clean_nested_fences(text: str, tasks: dict) -> str:
+        """
+        清理框架文本中的嵌套代码围栏。
+
+        处理两种历史数据问题：
+        1. 外层围栏：整个框架被 ```language ... ``` 包裹
+           （旧版 _merge_same_preset_fences 添加）
+        2. 双重围栏：同一位置出现两层相同围栏
+           （框架模板自带 + 旧版 fill_task 叠加）
+        """
+        text = text.strip()
+
+        # ── Step 1: 剥离外层围栏 ──
+        # 如果框架文本以 ``` 开头，说明整个框架被包裹在一个大围栏中
+        if text.startswith('```'):
+            lines = text.split('\n')
+            # 从末尾向前查找配对的闭合 ```
+            for i in range(len(lines) - 1, 0, -1):
+                if lines[i].strip() == '```':
+                    inner = '\n'.join(lines[1:i])
+                    # 验证内部围栏配对（偶数个 ```）
+                    if inner.count('```') % 2 == 0:
+                        text = inner
+                        break
+            else:
+                # 未找到配对，保持原文
+                pass
+
+        # ── Step 2: 消除连续重复围栏 ──
+        # 旧版 fill_task 在框架模板已有 ```python 的情况下又叠加了一层 ```python，
+        # 产生 ```python\n```python\ncode\n```\n``` 形式的双重围栏。
+        # 逐行扫描，跳过与前一行相同围栏语言的重复围栏行。
+        lines = text.split('\n')
+        result = []
+        prev_fence = None
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('```'):
+                if stripped == prev_fence:
+                    # 与上一个围栏相同，跳过重复
+                    prev_fence = None  # 重置，防止三重围栏
+                    continue
+                prev_fence = stripped
+            else:
+                prev_fence = None
+            result.append(line)
+
+        return '\n'.join(result)
 
     @staticmethod
     def _is_framework_code_like(text: str) -> bool:
@@ -256,8 +330,10 @@ class OutputManager:
     def _merge_same_preset_fences(self, text: str, tasks: dict) -> str:
         """
         当所有已填充的父级 task 使用相同的代码类预设时，
-        将框架中的独立代码围栏合并为一个统一的围栏，
-        避免框架中的非围栏代码（如 import）显示为普通文本。
+        检查是否需要合并代码围栏。
+
+        如果框架文本中已包含代码围栏（AI 生成的框架模板通常自带围栏），
+        则不再包裹外层围栏，避免嵌套围栏导致 markdown 渲染异常。
         """
         filled_tasks = {tid: t for tid, t in tasks.items()
                         if t.get('content')}
@@ -275,6 +351,12 @@ class OutputManager:
 
         # 检查框架中的非围栏部分是否主要为代码
         if not self._is_framework_code_like(text):
+            return text
+
+        # ── 关键防御：如果框架文本已包含代码围栏，不再包裹外层围栏 ──
+        # AI 生成的框架模板通常在每个 task 位置已有 ```python 围栏，
+        # 再包裹外层围栏会导致嵌套冲突，破坏 markdown 渲染。
+        if '```' in text:
             return text
 
         # 获取围栏语言标识
@@ -307,30 +389,32 @@ class OutputManager:
         当 task 占位符原本处于行内位置（如 "- file.py: [task2]"），
         而填充内容为多行文本或代码块时，替换后会导致 markdown 渲染异常。
         此方法检测并修正这种情况，在每个内联多行内容前插入换行。
-        同时根据 preset 类型自动包裹代码围栏。
+        同时根据 preset 类型和框架围栏上下文决定是否需要围栏包裹。
         """
-        # 预计算每个 task 的显示内容（含围栏包裹）
+        # 预计算每个 task 的显示内容和实际存储形式
         display_contents = {}
+        stored_contents = {}
         for tid, task in tasks.items():
             if task.get("content"):
-                display_contents[tid] = self._get_display_content(task)
+                dc = self._get_display_content(task)
+                display_contents[tid] = dc
+                # 如果 task 是以原始内容填充的（框架已有围栏），存储的是原始内容
+                if task.get("_filled_as_raw"):
+                    stored_contents[tid] = task["content"]
+                else:
+                    stored_contents[tid] = dc
 
-        # 第一步：将已填充的内容还原为占位符（按内容长度降序，防止子串误匹配）
+        # 第一步：将已填充的内容还原为占位符（按存储内容长度降序，防止子串误匹配）
         sorted_tasks = sorted(
             [(tid, t) for tid, t in tasks.items() if tid in display_contents],
-            key=lambda x: len(display_contents[x[0]]),
+            key=lambda x: len(stored_contents[x[0]]),
             reverse=True
         )
         for tid, task in sorted_tasks:
-            dc = display_contents[tid]
+            sc = stored_contents[tid]
             placeholder = f"[{tid}]"
-            if dc in text:
-                text = text.replace(dc, placeholder, 1)
-            else:
-                # 回退：尝试原始内容（历史数据可能未包裹围栏）
-                raw = task.get("content", "")
-                if raw and raw != dc and raw in text:
-                    text = text.replace(raw, placeholder, 1)
+            if sc in text:
+                text = text.replace(sc, placeholder, 1)
 
         # 第二步：对每个占位符检测是否处于行内位置，若是则补换行
         for tid, task in sorted_tasks:
@@ -338,7 +422,9 @@ class OutputManager:
             placeholder = f"[{tid}]"
             if placeholder not in text:
                 continue
-            if '\n' in dc or '```' in dc:
+            # 使用实际存储内容判断是否需要换行修正
+            sc = stored_contents[tid]
+            if '\n' in sc or '```' in sc:
                 pattern = r'(\S)([ \t]*)' + re.escape(placeholder)
                 match = re.search(pattern, text)
                 if match:
@@ -348,10 +434,14 @@ class OutputManager:
                         text
                     )
 
-        # 第三步：将占位符替换回显示内容（含围栏）
+        # 第三步：将占位符替换回内容（根据框架围栏上下文决定用围栏还是原始内容）
         for tid, task in sorted_tasks:
             placeholder = f"[{tid}]"
-            text = text.replace(placeholder, display_contents[tid])
+            if task.get("_filled_as_raw"):
+                # 框架已有围栏，使用原始内容
+                text = text.replace(placeholder, task["content"])
+            else:
+                text = text.replace(placeholder, display_contents[tid])
 
         return text
 

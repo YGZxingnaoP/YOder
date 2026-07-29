@@ -232,6 +232,9 @@ def _parse_framework_output(response: str) -> tuple:
     json_data = _extract_json(response)
     if json_data and "framework" in json_data and "tasks" in json_data:
         framework_text = json_data["framework"]
+        # 剥离 AI 可能在 framework 字段值中添加的外层代码围栏
+        # 例如 AI 输出 framework: "```python\n...\n```" 时需要去掉外层围栏
+        framework_text = _strip_outer_fence(framework_text)
         for tid, tdata in json_data["tasks"].items():
             tasks[tid] = {
                 "status": "pending",
@@ -264,6 +267,36 @@ def _parse_framework_output(response: str) -> tuple:
             }
 
     return framework_text, tasks
+
+
+def _strip_outer_fence(text: str) -> str:
+    """
+    剥离文本最外层的代码围栏。
+    AI 有时会在 framework 字段值中添加外层围栏，如：
+    ```python\n...\n``` 或 ```\n...\n```
+    需要去掉这层围栏，保留内部内容。
+    """
+    stripped = text.strip()
+    if not stripped.startswith('```'):
+        return text
+
+    lines = stripped.split('\n')
+    if len(lines) < 2:
+        return text
+
+    # 查找与首行 ``` 对应的闭合 ```
+    # 首行可能是 ``` 或 ```language
+    for i in range(len(lines) - 1, 0, -1):
+        if lines[i].strip() == '```':
+            # 检查这是否是首行的配对（中间不应有未配对的 ```）
+            inner_text = '\n'.join(lines[1:i])
+            # 验证内部围栏是配对的
+            fence_count = inner_text.count('```')
+            if fence_count % 2 == 0:
+                return inner_text
+            break
+
+    return text
 
 
 def _extract_json(text: str) -> Optional[dict]:
@@ -398,6 +431,7 @@ def run_task_review(
             # 同步框架文本（审查者可能拆分/合并了 task）
             corrected_framework = review_data.get("corrected_framework", "")
             if corrected_framework:
+                corrected_framework = _strip_outer_fence(corrected_framework)
                 output_mgr.set_framework(corrected_framework)
 
             new_task_ids = set(corrected.keys())
