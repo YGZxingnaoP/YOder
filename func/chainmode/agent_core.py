@@ -87,6 +87,8 @@ def run_agent_pipeline(
                 stream_callback(f"fold:{name}", content)
         return _cb
 
+    effective_mode = agent_mode if agent_mode else "code"
+
     try:
         phase1_result = run_phase1(
             client=client,
@@ -106,6 +108,7 @@ def run_agent_pipeline(
             progress_callback=progress_callback,
             stop_check=user_stop_check,
             stop_history=stop_history,
+            agent_mode=effective_mode,
         )
     except ContentFilterError as e:
         # 阶段一就触发了内容安全审查
@@ -154,6 +157,7 @@ def run_agent_pipeline(
             thinking_callback=_named_think("阶段一思考：任务审查"),
             progress_callback=progress_callback,
             stop_check=user_stop_check,
+            agent_mode=effective_mode,
         )
 
         # ═══════════════════════════════════════════
@@ -176,13 +180,12 @@ def run_agent_pipeline(
             thinking_callback=_named_think("阶段一思考：框架终审"),
             progress_callback=progress_callback,
             stop_check=user_stop_check,
+            agent_mode=effective_mode,
         )
 
         # ═══════════════════════════════════════════
         # 阶段一 Part V：编写准则生成
         # ═══════════════════════════════════════════
-
-        effective_mode = agent_mode if agent_mode else "code"
 
         if progress_callback:
             tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
@@ -528,6 +531,7 @@ def _run_framework_final_review(
     thinking_callback: Optional[Callable] = None,
     progress_callback: Optional[Callable] = None,
     stop_check: Optional[Callable] = None,
+    agent_mode: str = "code",
 ):
     """
     框架终审：在编写准则生成之前，审查框架和任务定义是否合理。
@@ -600,6 +604,7 @@ def _run_framework_final_review(
         # 重建框架：重新运行 Part II
         from .taskchunks.file_reader import read_file_full
         from .taskchunks.agent_prompts import PHASE1_FRAMEWORK_SYSTEM, PHASE1_FRAMEWORK_USER
+        from .taskchunks.agent_prompts import TASK_SPLITTING_RULES_CODE, TASK_SPLITTING_RULES_ARTICLE, TASK_SPLITTING_RULES_RP
 
         # 重新构建文件预览
         file_preview = ""
@@ -613,6 +618,13 @@ def _run_framework_final_review(
         fw_sys = PHASE1_FRAMEWORK_SYSTEM
         if system_prompt:
             fw_sys = f"{system_prompt}\n\n---\n\n{fw_sys}"
+
+        splitting_rules = {
+            "code": TASK_SPLITTING_RULES_CODE,
+            "article": TASK_SPLITTING_RULES_ARTICLE,
+            "rp": TASK_SPLITTING_RULES_RP,
+        }.get(agent_mode, TASK_SPLITTING_RULES_CODE)
+        fw_sys = fw_sys.replace("{task_splitting_rules}", splitting_rules)
 
         fw_user = PHASE1_FRAMEWORK_USER.format(
             user_message=user_message,
@@ -665,6 +677,7 @@ def _run_framework_final_review(
             thinking_callback=thinking_callback,
             progress_callback=progress_callback,
             stop_check=stop_check,
+            agent_mode=agent_mode,
         )
 
         # 更新审查消息

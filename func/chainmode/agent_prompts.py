@@ -181,12 +181,24 @@ framework 是骨架，task 是血肉。具体规则：
 ```
 
 ## 任务拆分原则（严格遵守）：
-- **每个需要修改或创建的文件必须对应一个独立的 task**。绝对不要将多个文件的代码合并到一个 task 中
+{task_splitting_rules}
 - task 之间应有明确的边界，避免重叠
-- task 数量由文件数量自然决定，有多少个文件就拆多少个 task
 - task ID 使用 task1, task2, task3... 格式
-- 每个 task 的 description 必须精确到具体文件名和具体功能，不能是宽泛的概括
+- 每个 task 的 description 必须精确到具体产出物和内容要点，不能是宽泛的概括
 - framework 文本中，[task_n] 占位符标记的是需要填充的具体位置
+
+## 重要约束：
+- 只输出 JSON，不要输出其他内容
+- 自主设计最适合当前任务的框架结构，不要套用固定模式
+- framework 中不应包含大段实质内容，这些内容必须委托给 [task_n]
+- 确保 framework 中每个 [task_n] 都有对应的 tasks 条目"""
+
+
+# ─── 模式感知的任务拆分规则 ───
+
+TASK_SPLITTING_RULES_CODE = """- **每个需要修改或创建的文件必须对应一个独立的 task**。绝对不要将多个文件的代码合并到一个 task 中
+- task 数量由文件数量自然决定，有多少个文件就拆多少个 task
+- 每个 task 的 description 必须精确到具体文件名和具体功能，不能是宽泛的概括
 - 如果一个文件既需要参考原文件又需要创建新文件（如移动文件），原文件和新文件放在同一个 task 的 files 中
 
 ### ❌ 错误示例（严禁）：
@@ -194,11 +206,11 @@ framework 是骨架，task 是血肉。具体规则：
 {
     "task3": {
         "description": "新建 func/lmm/ 多模态模型文件夹，包含核心调度类以及各大模型的多模态接口适配",
-        "files": ["func/lmm/lmm_core.py", "func/lmm/qwen_lmm.py", "func/lmm/glm_lmm.py", "func/lmm/kimi_lmm.py"]
+        "files": ["func/lmm/lmm_core.py", "func/lmm/qwen_lmm.py", "func/lmm/glm_lmm.py"]
     }
 }
 ```
-→ 一个 task 包含 4 个文件，填充时必然被截断或质量低下。
+→ 一个 task 包含 3 个文件，填充时必然被截断或质量低下。
 
 ### ✅ 正确做法：
 ```json
@@ -214,20 +226,56 @@ framework 是骨架，task 是血肉。具体规则：
     "task5": {
         "description": "创建 func/lmm/glm_lmm.py GLM 多模态接口适配",
         "files": ["func/lmm/glm_lmm.py"]
-    },
-    "task6": {
-        "description": "创建 func/lmm/kimi_lmm.py Kimi 多模态接口适配",
-        "files": ["func/lmm/kimi_lmm.py"]
     }
 }
 ```
-→ 每个文件独立一个 task，填充时专注且完整。
+→ 每个文件独立一个 task，填充时专注且完整。"""
 
-## 重要约束：
-- 只输出 JSON，不要输出其他内容
-- 自主设计最适合当前任务的框架结构，不要套用固定模式
-- framework 中不应包含大段实质内容，这些内容必须委托给 [task_n]
-- 确保 framework 中每个 [task_n] 都有对应的 tasks 条目"""
+
+TASK_SPLITTING_RULES_ARTICLE = """- 每个 task 应对应文章中的一个独立章节或段落
+- task 数量由文章结构自然决定（如：引言、各章节、结论各一个 task）
+- 如果用户指定了输出文件（如 .md 文件），所有章节 task 的 files 中都包含该文件
+
+### 示例：
+```json
+{
+    "task1": {
+        "description": "撰写引言章节：介绍项目背景和本文目的",
+        "files": ["report.md"]
+    },
+    "task2": {
+        "description": "撰写第二章：技术方案设计与架构分析",
+        "files": ["report.md"]
+    },
+    "task3": {
+        "description": "撰写结论章节：总结核心发现并提出建议",
+        "files": ["report.md"]
+    }
+}
+```"""
+
+
+TASK_SPLITTING_RULES_RP = """- 每个 task 应对应故事中的一个独立场景或对话段落
+- task 数量由叙事结构自然决定（如：开场、冲突、高潮、结局各一个 task）
+- 如果用户指定了输出文件，所有 task 的 files 中都包含该文件
+
+### 示例：
+```json
+{
+    "task1": {
+        "description": "开场场景：酒馆内，主角与陌生人初次相遇，氛围轻松",
+        "files": ["story.md"]
+    },
+    "task2": {
+        "description": "冲突场景：发现背叛，情绪急转直下，对话充满张力",
+        "files": ["story.md"]
+    },
+    "task3": {
+        "description": "结局场景：雨中和解，情感释放，留下余韵",
+        "files": ["story.md"]
+    }
+}
+```"""
 
 
 PHASE1_FRAMEWORK_USER = """## 用户指令:
@@ -505,10 +553,8 @@ PHASE1_TASKREVIEW_SYSTEM = """你是一个智能助手，正在以 Agent 模式�
 ## 审查要点（按优先级排序）：
 
 ### 🔴 硬性规则（必须首先检查，违反则必须修正）：
-1. **一文件一 task**：逐一检查每个 task 的 files 列表。如果任何 task 的 files 包含超过 1 个文件，必须将其拆分为多个独立 task。这是最重要的规则，没有例外。
-   - 错误：task3.files = ["lmm_core.py", "qwen_lmm.py", "glm_lmm.py"] → 必须拆成 3 个 task
-   - 正确：每个 task 的 files 只包含 1 个文件
-2. **描述具体性**：task 的 description 不能是宽泛的概括（如"处理多模态接口适配"），必须精确到具体文件名和具体功能（如"创建 qwen_lmm.py，实现 Qwen VL 的图片编码与文本拼接"）
+1. **task 粒度合理**：每个 task 应当是一个聚焦的、可独立完成的单元。如果当前是代码项目，每个 task 只能包含 1 个文件；如果是文章/创作项目，每个 task 应对应一个独立章节或场景。如果一个 task 的范围过大，必须拆分。
+2. **描述具体性**：task 的 description 不能是宽泛的概括，必须精确到具体的产出物和内容要点
 
 ### 🟡 软性规则（在硬性规则都满足后检查）：
 3. **task 间重叠**：是否有两个或多个 task 覆盖相同或高度相似的内容？
@@ -521,26 +567,27 @@ PHASE1_TASKREVIEW_SYSTEM = """你是一个智能助手，正在以 Agent 模式�
 仅输出: PASS
 
 ### 需要修正：
-输出 JSON 格式：
+输出 JSON 格式（注意 corrected_framework 字段）：
 ```json
 {
     "passed": false,
     "feedback": "说明哪些 task 有什么问题",
+    "corrected_framework": "修正后的完整框架文本（更新所有 [task_n] 占位符以匹配修正后的 task 列表）",
     "corrected_tasks": {
         "task1": {
-            "description": "修正后的描述（仅列出需要修正的 task，未修改的 task 也要包含以保持完整）",
-            "files": ["修正后的文件列表（每个 task 只能有 1 个文件）"],
+            "description": "修正后的描述（必须包含所有 task，包括未修改的）",
+            "files": ["修正后的文件列表"],
             "requirements": "修正后的要求",
-            "preset": "修正后的预设（python/c/cpp/java/javascript/html/css/shell/batch/sql/yaml/json/markdown/plaintext/article/roleplay/dialogue/csv/structured/code/mixed）"
+            "preset": "修正后的预设"
         }
     }
 }
 ```
 
 ## 重要约束：
-- 只修正有问题的 task 定义，不要改变框架结构
-- 保持所有 task ID 不变
 - corrected_tasks 必须包含所有 task（包括未修改的），确保完整性
+- **corrected_framework 必须与 corrected_tasks 完全同步**：如果新增/删除/重命名了 task，框架中的占位符必须相应更新
+- 只修正有问题的 task 定义，不要大幅改变框架结构
 - 不要因为小的措辞问题要求修正，只关注会导致填充失败的严重问题"""
 
 
@@ -575,11 +622,11 @@ PHASE1_FRAMEWORK_FINAL_REVIEW_SYSTEM = """你是一个智能助手，正在以 A
 ## 审查要点（按优先级排序）：
 
 ### 🔴 硬性规则（违反任何一条则必须重建）：
-1. **一文件一 task**：逐一检查每个 task 的 files 列表。如果任何 task 的 files 包含超过 1 个文件，必须重建框架将其拆分。这是最关键的检查项，没有例外。
+1. **task 粒度合理**：每个 task 应当是一个聚焦的、可独立完成的单元。如果当前是代码项目，每个 task 只能包含 1 个文件；如果是文章/创作项目，每个 task 应对应一个独立章节或场景。
 2. **文件覆盖完整性**：用户指令中提到的所有需要修改/创建的文件是否都有对应的 task？遗漏任何文件都是不可接受的。
 
 ### 🟡 软性规则：
-3. **任务定义完整**：每个 task 的 description 是否精确到具体文件名和功能？不能是宽泛的概括。
+3. **任务定义完整**：每个 task 的 description 是否精确到具体产出物和内容要点？不能是宽泛的概括。
 4. **框架结构清晰**：整体组织是否合理，占位符位置是否正确？
 
 ## 输出规则：

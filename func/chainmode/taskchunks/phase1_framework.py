@@ -17,6 +17,7 @@ from ..agent_prompts import (
     PHASE1_READ_SYSTEM, PHASE1_READ_USER,
     PHASE1_FRAMEWORK_SYSTEM, PHASE1_FRAMEWORK_USER,
     PHASE1_TASKREVIEW_SYSTEM, PHASE1_TASKREVIEW_USER,
+    TASK_SPLITTING_RULES_CODE, TASK_SPLITTING_RULES_ARTICLE, TASK_SPLITTING_RULES_RP,
 )
 
 
@@ -49,6 +50,7 @@ def run_phase1(
     progress_callback: Optional[Callable] = None,
     stop_check: Optional[Callable] = None,
     stop_history: str = "",
+    agent_mode: str = "code",
 ) -> Phase1Result:
     """
     执行阶段一：大框架构建。
@@ -148,6 +150,13 @@ def run_phase1(
     fw_sys_msg = PHASE1_FRAMEWORK_SYSTEM
     if system_prompt:
         fw_sys_msg = f"{system_prompt}\n\n---\n\n{fw_sys_msg}"
+
+    splitting_rules = {
+        "code": TASK_SPLITTING_RULES_CODE,
+        "article": TASK_SPLITTING_RULES_ARTICLE,
+        "rp": TASK_SPLITTING_RULES_RP,
+    }.get(agent_mode, TASK_SPLITTING_RULES_CODE)
+    fw_sys_msg = fw_sys_msg.replace("{task_splitting_rules}", splitting_rules)
 
     fw_messages = [
         {"role": "system", "content": fw_sys_msg},
@@ -294,6 +303,7 @@ def run_task_review(
     thinking_callback: Optional[Callable] = None,
     progress_callback: Optional[Callable] = None,
     stop_check: Optional[Callable] = None,
+    agent_mode: str = "code",
 ) -> None:
     """
     Part III: 审查 task 定义合理性，最多循环 3 次。
@@ -384,15 +394,32 @@ def run_task_review(
         corrected = review_data.get("corrected_tasks", {})
         if corrected:
             current_tasks = output_mgr.get_all_tasks()
+
+            # 同步框架文本（审查者可能拆分/合并了 task）
+            corrected_framework = review_data.get("corrected_framework", "")
+            if corrected_framework:
+                output_mgr.set_framework(corrected_framework)
+
+            new_task_ids = set(corrected.keys())
+            current_task_ids = set(current_tasks.keys())
+
+            # 更新/新增所有修正后的 task
             for tid, new_def in corrected.items():
-                if tid in current_tasks:
-                    output_mgr.update_task(
-                        tid,
-                        description=new_def.get("description", current_tasks[tid].get("description", "")),
-                        files=new_def.get("files", current_tasks[tid].get("files", [])),
-                        requirements=new_def.get("requirements", current_tasks[tid].get("requirements", "")),
-                        preset=new_def.get("preset", current_tasks[tid].get("preset", "mixed")),
-                    )
+                output_mgr.update_task(
+                    tid,
+                    description=new_def.get("description", current_tasks.get(tid, {}).get("description", "")),
+                    files=new_def.get("files", current_tasks.get(tid, {}).get("files", [])),
+                    requirements=new_def.get("requirements", current_tasks.get(tid, {}).get("requirements", "")),
+                    preset=new_def.get("preset", current_tasks.get(tid, {}).get("preset", "mixed")),
+                )
+
+            # 删除不在修正列表中的旧 task（被拆分的旧 task）
+            for old_tid in current_task_ids - new_task_ids:
+                data = output_mgr.load()
+                if old_tid in data["tasks"]:
+                    del data["tasks"][old_tid]
+                    output_mgr.save()
+
             previous_feedback = review_data.get("feedback", "")
         else:
             # 没有 corrected_tasks，视为通过
@@ -425,6 +452,7 @@ def run_framework_review(
     thinking_callback: Optional[Callable] = None,
     progress_callback: Optional[Callable] = None,
     stop_check: Optional[Callable] = None,
+    agent_mode: str = "code",
 ) -> bool:
     """
     框架审查重建：重新运行框架构建（Part II）和任务审查（Part III）。
@@ -452,6 +480,13 @@ def run_framework_review(
     fw_sys_msg = PHASE1_FRAMEWORK_SYSTEM
     if system_prompt:
         fw_sys_msg = f"{system_prompt}\n\n---\n\n{fw_sys_msg}"
+
+    splitting_rules = {
+        "code": TASK_SPLITTING_RULES_CODE,
+        "article": TASK_SPLITTING_RULES_ARTICLE,
+        "rp": TASK_SPLITTING_RULES_RP,
+    }.get(agent_mode, TASK_SPLITTING_RULES_CODE)
+    fw_sys_msg = fw_sys_msg.replace("{task_splitting_rules}", splitting_rules)
 
     fw_messages = [
         {"role": "system", "content": fw_sys_msg},
@@ -525,6 +560,7 @@ def run_framework_review(
         thinking_callback=thinking_callback,
         progress_callback=progress_callback,
         stop_check=stop_check,
+        agent_mode=agent_mode,
     )
 
     if progress_callback:
