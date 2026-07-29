@@ -13,6 +13,13 @@ class UserStoppedError(Exception):
     pass
 
 
+class ContentFilterError(Exception):
+    """API 内容安全审查拒绝时抛出的异常"""
+    def __init__(self, message="输入内容触发了 API 提供商的内容安全审查，请检查输入内容后重试。"):
+        self.message = message
+        super().__init__(self.message)
+
+
 def call_api(
     client: OpenAI,
     model: str,
@@ -42,14 +49,24 @@ def call_api(
         完整文本
     """
     full_text = ""
-    completion = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        stream=True,
-        extra_body=extra_body if extra_body else None,
-    )
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream=True,
+            extra_body=extra_body if extra_body else None,
+        )
+    except Exception as e:
+        # 检查是否为内容安全审查错误（400 错误）
+        error_str = str(e).lower()
+        if any(kw in error_str for kw in [
+            'data_inspection', 'content_filter', 'inappropriate content',
+            'content policy', 'safety', 'blocked', 'moderation'
+        ]):
+            raise ContentFilterError()  # 使用默认友好提示，不暴露原始错误
+        raise  # 其他异常正常抛出
     for chunk in completion:
         # 检查用户是否请求停止 —— 抛出异常穿透所有阶段，由管线顶层捕获
         if stop_check and stop_check():

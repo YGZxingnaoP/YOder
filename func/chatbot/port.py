@@ -128,7 +128,11 @@ class ChatClient:
             except Exception:
                 pass
         except Exception as e:
-            callback("error", str(e))
+            error_str = str(e).lower()
+            if any(kw in error_str for kw in ['data_inspection', 'content_filter', 'inappropriate content', 'content policy', 'safety', 'blocked', 'moderation']):
+                callback("error", "输入内容触发了 API 内容安全审查，请检查输入内容后重试。")
+            else:
+                callback("error", str(e))
 
     def chat_with_model(self, messages, callback, platform=None, model=None, stream=True, temperature=None, max_tokens=None, stop_check=None):
         """使用指定的平台和模型进行 chat 调用"""
@@ -164,7 +168,11 @@ class ChatClient:
             except Exception:
                 pass
         except Exception as e:
-            callback("error", str(e))
+            error_str = str(e).lower()
+            if any(kw in error_str for kw in ['data_inspection', 'content_filter', 'inappropriate content', 'content policy', 'safety', 'blocked', 'moderation']):
+                callback("error", "输入内容触发了 API 内容安全审查，请检查输入内容后重试。")
+            else:
+                callback("error", str(e))
 
     def _get_extra_body_for(self, platform):
         if platform == "阿里":

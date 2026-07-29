@@ -10,7 +10,7 @@ import os
 import re
 from typing import Optional, Callable
 
-from .taskchunks.api_caller import call_api, get_extra_body, UserStoppedError
+from .taskchunks.api_caller import call_api, get_extra_body, UserStoppedError, ContentFilterError
 from .taskchunks.file_reader import build_file_map
 from .taskchunks.history_builder import build_history_text, build_brief_history
 from .taskchunks.output_manager import OutputManager
@@ -81,24 +81,32 @@ def run_agent_pipeline(
                 stream_callback(f"fold:{name}", content)
         return _cb
 
-    phase1_result = run_phase1(
-        client=client,
-        model=model,
-        platform=platform,
-        user_message=user_message,
-        selected_files=selected_files,
-        root_path=root_path,
-        history_text=history_text,
-        system_prompt=system_prompt,
-        temp_dir=temp_dir,
-        thinking_level=thinking_level,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        stream_callback=stream_callback,
-        thinking_callback=_named_think("阶段一思考：文件检查与框架构建"),
-        progress_callback=progress_callback,
-        stop_check=user_stop_check,
-    )
+    try:
+        phase1_result = run_phase1(
+            client=client,
+            model=model,
+            platform=platform,
+            user_message=user_message,
+            selected_files=selected_files,
+            root_path=root_path,
+            history_text=history_text,
+            system_prompt=system_prompt,
+            temp_dir=temp_dir,
+            thinking_level=thinking_level,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream_callback=stream_callback,
+            thinking_callback=_named_think("阶段一思考：文件检查与框架构建"),
+            progress_callback=progress_callback,
+            stop_check=user_stop_check,
+        )
+    except ContentFilterError as e:
+        # 阶段一就触发了内容安全审查
+        if stream_callback:
+            stream_callback("content", f"> ⚠️ **API 内容安全审查拒绝**：{e.message}\n> 请检查输入内容后重试。")
+        if progress_callback:
+            progress_callback("内容安全审查拒绝", [])
+        return
 
     # ── 检查 stop ──
     if phase1_result.stopped:
@@ -406,6 +414,36 @@ def run_agent_pipeline(
 
         if progress_callback:
             progress_callback("用户已停止", [])
+
+    except ContentFilterError as e:
+        # ═══════════════════════════════════════════
+        # 内容安全审查拒绝：输出已完成内容 + 错误提示
+        # ═══════════════════════════════════════════
+        if output_mgr:
+            final_output = output_mgr.get_final_output()
+            if final_output:
+                tasks = output_mgr.get_all_tasks()
+                for tid, task in tasks.items():
+                    if not task.get("content"):
+                        placeholder = f"[{tid}]"
+                        final_output = final_output.replace(placeholder, "")
+                final_output = re.sub(r'\n{3,}', '\n\n', final_output).strip()
+
+                if final_output:
+                    final_output += f"\n\n---\n> ⚠️ **API 内容安全审查拒绝**：{e.message}\n> 已完成的任务内容已保留，请检查输入内容后重试。"
+                    if stream_callback:
+                        chunk_size = 50
+                        for i in range(0, len(final_output), chunk_size):
+                            chunk = final_output[i:i + chunk_size]
+                            stream_callback("content", chunk)
+        else:
+            # 阶段一就触发了，没有 output_mgr，直接流式输出错误信息
+            if stream_callback:
+                error_msg = f"> ⚠️ **API 内容安全审查拒绝**：{e.message}\n> 请检查输入内容后重试。"
+                stream_callback("content", error_msg)
+
+        if progress_callback:
+            progress_callback("内容安全审查拒绝", [])
 
 
 def _generate_principle(
