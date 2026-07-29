@@ -603,8 +603,8 @@ def _run_framework_final_review(
 
         # 重建框架：重新运行 Part II
         from .taskchunks.file_reader import read_file_full
-        from .taskchunks.agent_prompts import PHASE1_FRAMEWORK_SYSTEM, PHASE1_FRAMEWORK_USER
-        from .taskchunks.agent_prompts import TASK_SPLITTING_RULES_CODE, TASK_SPLITTING_RULES_ARTICLE, TASK_SPLITTING_RULES_RP
+        from .agent_prompts import PHASE1_FRAMEWORK_SYSTEM, PHASE1_FRAMEWORK_USER
+        from .agent_prompts import TASK_SPLITTING_RULES_CODE, TASK_SPLITTING_RULES_ARTICLE, TASK_SPLITTING_RULES_RP
 
         # 重新构建文件预览
         file_preview = ""
