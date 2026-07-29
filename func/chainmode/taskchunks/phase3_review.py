@@ -1,7 +1,7 @@
 """
-phase3_review.py - 阶段三：完整格式和内容审查
-审查最终 output.json，若有问题则指定 task 重做（重回阶段二）。
-最多 6 次审查。仅审查父级 task。
+phase3_review.py - 阶段三：内容审查
+审查最终 output.json 中各 task 的填充内容，若有问题则指定 task 重做（重回阶段二）。
+最多 6 次审查。
 """
 import json
 import os
@@ -41,24 +41,16 @@ def run_phase3(
     thinking_callback: Optional[Callable] = None,
     progress_callback: Optional[Callable] = None,
     phase2_runner: Optional[Callable] = None,
-    coordinated_runner: Optional[Callable] = None,
-    framework_runner: Optional[Callable] = None,
     stop_check: Optional[Callable] = None,
 ) -> Phase3Result:
     """
-    执行阶段三：审查最终输出。
+    执行阶段三：审查最终输出内容。
 
     Args:
         output_mgr: 阶段二完成后的 OutputManager
         phase2_runner: 回调函数，用于重做指定 task。
-                       签名: phase2_runner(task_id, sibling_context="", associated_tasks=None) -> bool
+                       签名: phase2_runner(task_id, sibling_context="") -> bool
                        返回 True 表示重做成功。
-                       associated_tasks 是审查 AI 识别出的与该 task 关联的 task_id 列表，
-                       其内容会被注入到重做提示词中。
-        coordinated_runner: 协调重做回调，用于多次失败后的批量重做。
-                       签名: coordinated_runner(failed_task_ids, feedback) -> bool
-        framework_runner: 框架重建回调，用于框架本身不合理时重建整个框架并重新执行所有 task。
-                       签名: framework_runner() -> bool
 
     Returns:
         Phase3Result
@@ -75,8 +67,6 @@ def run_phase3(
         file_paths_text = "(未选择文件)"
 
     previous_feedback = ""
-    framework_redo_count = 0
-    MAX_FRAMEWORK_REDOS = 2
 
     for attempt in range(1, MAX_REVIEW_ATTEMPTS + 1):
         result.review_count = attempt
@@ -88,15 +78,9 @@ def run_phase3(
         # ── 构建审查消息 ──
         tasks = output_mgr.get_all_tasks()
 
-        # 仅审查父级 task
-        parent_tasks = {}
-        for tid, task in tasks.items():
-            if not task.get("parent"):
-                parent_tasks[tid] = task
-
         # 构建 task 摘要（不含文件内容，仅含文件路径和要求）
         task_summary = ""
-        for tid, task in parent_tasks.items():
+        for tid, task in tasks.items():
             task_summary += f"\n### {tid}\n"
             task_summary += f"描述: {task.get('description', '')}\n"
             task_summary += f"文件: {', '.join(task.get('files', []))}\n"
@@ -117,7 +101,6 @@ def run_phase3(
             file_paths=file_paths_text,
             task_summary=task_summary,
             framework=framework,
-            principle=output_mgr.get_principle_text(),
             previous_feedback=previous_feedback if previous_feedback else "(首次审查)",
             attempt_number=attempt,
         )
@@ -149,7 +132,7 @@ def run_phase3(
         )
 
         # ── 解析审查结果 ──
-        passed, failed_task_ids, feedback, associated_tasks, redo_framework = _parse_review_result(review_response)
+        passed, failed_task_ids, feedback = _parse_review_result(review_response)
 
         if passed:
             result.passed = True
@@ -162,23 +145,6 @@ def run_phase3(
         # ── 审查未通过，需要重做 ──
         result.final_feedback = feedback
 
-        # ── 框架级别重做：框架本身不合理，重建整个框架 ──
-        if redo_framework and framework_runner and framework_redo_count < MAX_FRAMEWORK_REDOS:
-            if progress_callback:
-                tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
-                progress_callback(f"阶段三：框架审查不通过，重建框架", tasklist)
-
-            framework_redo_count += 1
-            _reset_all_tasks_for_redo(output_mgr)
-            success = framework_runner()
-
-            if progress_callback:
-                tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
-                progress_callback(f"阶段三：框架重建{'成功' if success else '失败'}，准备重新审查", tasklist)
-
-            previous_feedback = f"第{attempt}次审查：框架被判定需要重建。{feedback}\n" + previous_feedback
-            continue
-
         if progress_callback:
             tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
             progress_callback(f"阶段三：审查未通过，重做 {failed_task_ids}", tasklist)
@@ -187,51 +153,29 @@ def run_phase3(
         valid_failed = [tid for tid in failed_task_ids if tid in tasks]
         sibling_context = _build_sibling_context(tasks, valid_failed)
 
-        # ── 如果已有 2 次以上尝试且有协调重做器，使用协调模式 ──
-        if attempt >= 2 and coordinated_runner and len(valid_failed) > 1:
-            if progress_callback:
-                tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
-                progress_callback(f"阶段三：触发协调重做模式 {valid_failed}", tasklist)
+        # ── 逐个重做 ──
+        for idx, failed_tid in enumerate(valid_failed):
+            # 标记为 error 并重做
+            output_mgr.mark_error(failed_tid, feedback)
+            result.redone_tasks.append(failed_tid)
 
-            # 先标记所有失败 task 为 error
-            for failed_tid in valid_failed:
-                output_mgr.mark_error(failed_tid, feedback)
-                result.redone_tasks.append(failed_tid)
-
-            success = coordinated_runner(valid_failed, feedback)
-            if success:
-                previous_feedback = f"第{attempt}次审查失败后协调重做完成，涉及：{', '.join(valid_failed)}。\n"
-            else:
-                previous_feedback = f"第{attempt}次审查失败后协调重做未完全成功，涉及：{', '.join(valid_failed)}。\n"
-        else:
-            # ── 普通模式：逐个重做，但注入兄弟上下文和关联 task 上下文 ──
-            # 关键：每重做一个 task 后重建兄弟上下文，让后续重做能看到前一个 task 的修改内容（同审查周期内）
-            for idx, failed_tid in enumerate(valid_failed):
-                # 标记为 error 并重做
-                output_mgr.mark_error(failed_tid, feedback)
-                result.redone_tasks.append(failed_tid)
-
-                # 获取该 task 的关联 task 列表
-                task_associated = associated_tasks.get(failed_tid, [])
-
-                # 通过 phase2_runner 重做该 task（传入兄弟上下文和关联 task）
-                if phase2_runner:
-                    success = phase2_runner(
-                        failed_tid,
-                        sibling_context=sibling_context,
-                        associated_tasks=task_associated,
-                    )
-                    if not success:
-                        previous_feedback = f"task {failed_tid} 重做失败。\n" + previous_feedback
-                    else:
-                        previous_feedback = f"task {failed_tid} 已重做。\n" + previous_feedback
+            # 通过 phase2_runner 重做该 task
+            if phase2_runner:
+                success = phase2_runner(
+                    failed_tid,
+                    sibling_context=sibling_context,
+                )
+                if not success:
+                    previous_feedback = f"task {failed_tid} 重做失败。\n" + previous_feedback
                 else:
-                    previous_feedback = f"task {failed_tid} 标记重做（无 runner）。\n" + previous_feedback
+                    previous_feedback = f"task {failed_tid} 已重做。\n" + previous_feedback
+            else:
+                previous_feedback = f"task {failed_tid} 标记重做（无 runner）。\n" + previous_feedback
 
-                # 关键：重做后重建兄弟上下文，让下一个重做看到当前 task 的修改内容（不跨审查周期）
-                if idx < len(valid_failed) - 1:
-                    latest_tasks = output_mgr.get_all_tasks()
-                    sibling_context = _build_sibling_context(latest_tasks, valid_failed)
+            # 重做后重建兄弟上下文，让下一个重做看到当前 task 的修改内容
+            if idx < len(valid_failed) - 1:
+                latest_tasks = output_mgr.get_all_tasks()
+                sibling_context = _build_sibling_context(latest_tasks, valid_failed)
 
         previous_feedback = feedback + "\n" + previous_feedback
 
@@ -272,17 +216,6 @@ def _build_sibling_context(tasks: dict, failed_ids: list) -> str:
     return "\n\n".join(parts)
 
 
-def _reset_all_tasks_for_redo(output_mgr: OutputManager):
-    """
-    重置所有 task 状态为 pending，恢复框架中的占位符。
-    用于框架重建前清理所有 task 内容。
-    """
-    tasks = output_mgr.get_all_tasks()
-    for tid in list(tasks.keys()):
-        output_mgr.restore_task_placeholder(tid)
-        output_mgr.update_task(tid, status="pending", content="", review_feedback="")
-
-
 def _parse_review_result(response: str) -> tuple:
     """
     解析审查结果。
@@ -292,55 +225,43 @@ def _parse_review_result(response: str) -> tuple:
     2. JSON 格式指出问题 task：
        {
            "passed": false,
-           "redo_framework": false,
            "failed_tasks": ["task1", "task3"],
-           "associated_tasks": {
-               "task1": ["task2"],
-               "task3": ["task4", "task5"]
-           },
            "feedback": "task1: 代码不完整..."
        }
 
     Returns:
-        (passed: bool, failed_task_ids: list, feedback: str, associated_tasks: dict, redo_framework: bool)
+        (passed: bool, failed_task_ids: list, feedback: str)
     """
     stripped = response.strip()
 
     # 快速判断通过
-    pass_keywords = ["通过", "pass", "没有问题", "没有问题", "审查通过", "合格", "PASS"]
+    pass_keywords = ["通过", "pass", "没有问题", "审查通过", "合格", "PASS"]
     if any(kw in stripped.lower() for kw in pass_keywords) and not any(
         kw in stripped.lower() for kw in ["不通过", "未通过", "问题", "fail", "failed"]
     ):
-        return True, [], "审查通过", {}, False
+        return True, [], "审查通过"
 
     # 尝试 JSON 解析
     json_data = _extract_json(response)
     if json_data and isinstance(json_data, dict):
         passed = json_data.get("passed", False)
         if passed:
-            return True, [], "审查通过", {}, False
+            return True, [], "审查通过"
         failed = json_data.get("failed_tasks", [])
         if isinstance(failed, list):
             failed = [str(f).lower() for f in failed]
         feedback = json_data.get("feedback", response)
-        associated = json_data.get("associated_tasks", {})
-        if not isinstance(associated, dict):
-            associated = {}
-        # 将 associated_tasks 的 key 也转换为小写
-        associated = {str(k).lower(): [str(v).lower() for v in vs] if isinstance(vs, list) else []
-                      for k, vs in associated.items()}
-        redo_fw = bool(json_data.get("redo_framework", False))
         if failed:
-            return False, failed, feedback, associated, redo_fw
+            return False, failed, feedback
 
     # 尝试从文本中提取失败 task ID
     failed_pattern = re.findall(r'\[(task[\d_]+)\]', response, re.IGNORECASE)
     if failed_pattern:
         failed = list(set(t.lower() for t in failed_pattern))
-        return False, failed, response, {}, False
+        return False, failed, response
 
     # 无法解析，默认通过（避免无限循环）
-    return True, [], "审查结果无法解析，默认通过", {}, False
+    return True, [], "审查结果无法解析，默认通过"
 
 
 def _extract_json(text: str) -> Optional[dict]:

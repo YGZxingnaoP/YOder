@@ -24,8 +24,6 @@ class OutputManager:
                 "files": ["文件路径列表"],
                 "requirements": "任务要求提示词",
                 "content": "填充后的内容",
-                "parent": null,
-                "children": ["task1_1", "task1_2"],
                 "retry_count": 0,
                 "review_feedback": ""
             },
@@ -149,67 +147,20 @@ class OutputManager:
             result.append(line)
         return '\n'.join(result)
 
-    def add_subtask(self, parent_id: str, subtask_id: str, description: str,
-                    files: list = None, requirements: str = ""):
-        """添加子任务"""
-        data = self.load()
-        if parent_id not in data["tasks"]:
-            return
-        parent = data["tasks"][parent_id]
-        if "children" not in parent:
-            parent["children"] = []
-        parent["children"].append(subtask_id)
-        data["tasks"][subtask_id] = {
-            "status": "pending",
-            "description": description,
-            "files": files or [],
-            "requirements": requirements,
-            "content": "",
-            "parent": parent_id,
-            "children": [],
-            "retry_count": 0,
-            "review_feedback": ""
-        }
-        self.save()
-
     def restore_task_placeholder(self, task_id: str):
         """恢复 task 在框架中的占位符（用于重做前）"""
         data = self.load()
         task = data.get("tasks", {}).get(task_id)
         if not task:
             return
-        children = task.get("children", [])
-        if children:
-            # 有子任务：恢复子任务占位符
-            # 先移除各子任务已填充的内容，恢复为占位符
-            for child_id in children:
-                child = data["tasks"].get(child_id)
-                if child:
-                    # 先尝试围栏版本（当前框架中存储的）
-                    display_content = self._get_display_content(child)
-                    if display_content and display_content in data["framework"]:
-                        data["framework"] = data["framework"].replace(display_content, f"[{child_id}]")
-                    else:
-                        # 回退：尝试原始内容
-                        child_content = child.get("content", "")
-                        if child_content and child_content in data["framework"]:
-                            data["framework"] = data["framework"].replace(child_content, f"[{child_id}]")
-                    child["status"] = "pending"
-                    child["content"] = ""
-            # 子任务占位符组合还原父 task 占位符
-            sub_placeholder = "\n".join(f"[{c}]" for c in children)
-            data["framework"] = data["framework"].replace(sub_placeholder, f"[{task_id}]")
+        # 直接恢复 task 占位符
+        display_content = self._get_display_content(task)
+        if display_content and display_content in data["framework"]:
+            data["framework"] = data["framework"].replace(display_content, f"[{task_id}]")
         else:
-            # 无子任务：直接恢复父 task 占位符
-            # 先尝试围栏版本
-            display_content = self._get_display_content(task)
-            if display_content and display_content in data["framework"]:
-                data["framework"] = data["framework"].replace(display_content, f"[{task_id}]")
-            else:
-                # 回退：尝试原始内容
-                content = task.get("content", "")
-                if content and content in data["framework"]:
-                    data["framework"] = data["framework"].replace(content, f"[{task_id}]")
+            content = task.get("content", "")
+            if content and content in data["framework"]:
+                data["framework"] = data["framework"].replace(content, f"[{task_id}]")
         self.save()
 
     def mark_error(self, task_id: str, feedback: str):
@@ -228,20 +179,11 @@ class OutputManager:
         return data.get("tasks", {})
 
     def get_pending_tasks(self) -> list:
-        """获取所有 pending 状态的 task_id（按插入顺序，父级优先）"""
+        """获取所有 pending 状态的 task_id（按插入顺序）"""
         data = self.load()
         result = []
         for tid, task in data.get("tasks", {}).items():
             if task.get("status") == "pending":
-                result.append(tid)
-        return result
-
-    def get_parent_tasks(self) -> list:
-        """获取所有父级 task（parent 为 null 或不存在的）"""
-        data = self.load()
-        result = []
-        for tid, task in data.get("tasks", {}).items():
-            if not task.get("parent"):
                 result.append(tid)
         return result
 
@@ -272,7 +214,7 @@ class OutputManager:
         for tid, task in tasks.items():
             task_files = task.get("files", [])
             content = task.get("content", "")
-            if task_files and content and not task.get("parent"):
+            if task_files and content:
                 for f in task_files:
                     if f not in file_entries:
                         file_entries.append(f)
@@ -318,7 +260,7 @@ class OutputManager:
         避免框架中的非围栏代码（如 import）显示为普通文本。
         """
         filled_tasks = {tid: t for tid, t in tasks.items()
-                        if t.get('content') and not t.get('parent')}
+                        if t.get('content')}
         if not filled_tasks:
             return text
 

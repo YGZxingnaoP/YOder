@@ -1,7 +1,6 @@
 """
 phase2_filler.py - 阶段二：大框架内容填充
 逐个处理 task，填充 [task_n] 占位符。
-AI 可发起子任务创建（[task1_1]、[task1_2]）。
 """
 import json
 import os
@@ -21,7 +20,6 @@ class Phase2Result:
     def __init__(self):
         self.all_filled = True      # 所有 task 都成功填充
         self.failed_tasks = []      # 填充失败的 task_id 列表
-        self.subtask_creations = [] # [(parent_id, [subtask_ids])] 记录子任务创建
 
 
 def run_phase2(
@@ -70,7 +68,7 @@ def run_phase2(
 
     # ── 逐个处理 task ──
     while True:
-        # 重新获取最新 task 列表（可能新增子任务）
+        # 获取最新 task 列表
         tasks = output_mgr.get_all_tasks()
         task_order = build_task_order(tasks)
 
@@ -180,37 +178,15 @@ def run_phase2(
         )
 
         # ── 解析输出 ──
-        fill_content, new_subtasks = _parse_fill_output(task_response, tid)
+        fill_content = task_response.strip()
 
-        # ── 处理子任务创建 ──
-        if new_subtasks:
-            for sub_tid, sub_data in new_subtasks.items():
-                output_mgr.add_subtask(
-                    parent_id=tid,
-                    subtask_id=sub_tid,
-                    description=sub_data.get("description", ""),
-                    files=sub_data.get("files", []),
-                    requirements=sub_data.get("requirements", ""),
-                )
-            result.subtask_creations.append((tid, list(new_subtasks.keys())))
-
-            # 不填充当前 task（它被拆分为子任务了），重新进入循环处理子任务
-            # 标记当前 task 为 filled（其内容在框架中由子任务占位）
-            sub_placeholder = "\n".join(f"[{st}]" for st in new_subtasks.keys())
-            output_mgr.fill_task(tid, sub_placeholder)
-
-            # 更新 UI tasklist
-            if progress_callback:
-                tasklist = build_tasklist_for_ui(output_mgr.get_all_tasks())
-                progress_callback(f"阶段二：{tid} 拆分为子任务", tasklist)
+        # ── 正常填充 ──
+        if fill_content:
+            output_mgr.fill_task(tid, fill_content)
         else:
-            # ── 正常填充 ──
-            if fill_content.strip():
-                output_mgr.fill_task(tid, fill_content)
-            else:
-                output_mgr.update_task(tid, status="error", review_feedback="输出为空")
-                result.failed_tasks.append(tid)
-                result.all_filled = False
+            output_mgr.update_task(tid, status="error", review_feedback="输出为空")
+            result.failed_tasks.append(tid)
+            result.all_filled = False
 
         # ── 每完成一个 task 更新 UI ──
         if progress_callback:
@@ -229,7 +205,6 @@ def _extract_task_context(framework: str, task_id: str) -> str:
     """
     从框架中提取 task 的完整上下文，
     帮助 AI 理解此 task 在整体结构中的位置。
-    不截断，返回完整框架。
     """
     placeholder = f"[{task_id}]"
     idx = framework.find(placeholder)
@@ -241,90 +216,3 @@ def _extract_task_context(framework: str, task_id: str) -> str:
 def _get_framework_snippet(framework: str, task_id: str) -> str:
     """获取完整框架内容"""
     return framework
-
-
-def _parse_fill_output(response: str, parent_tid: str) -> tuple:
-    """
-    解析阶段二的 task 填充输出。
-
-    AI 可能输出：
-    1. 直接内容文本（填充到 [task_n]）
-    2. JSON（含 content 和可能的 subtasks）
-
-    子任务格式（JSON）：
-    {
-        "content": "此 task 被拆分，内容为子任务占位说明",
-        "subtasks": {
-            "task1_1": {
-                "description": "子任务1描述",
-                "files": ["相关文件"],
-                "requirements": "子任务要求"
-            },
-            "task1_2": {
-                "description": "子任务2描述",
-                "files": ["相关文件"],
-                "requirements": "子任务要求"
-            }
-        }
-    }
-
-    Returns:
-        (fill_content, new_subtasks_dict)
-    """
-    new_subtasks = {}
-
-    # 尝试 JSON 解析
-    json_data = _extract_json(response)
-    if json_data and isinstance(json_data, dict):
-        content = json_data.get("content", "")
-        subtasks = json_data.get("subtasks", {})
-        if subtasks:
-            for sub_tid, sub_data in subtasks.items():
-                new_subtasks[sub_tid.lower()] = {
-                    "description": sub_data.get("description", ""),
-                    "files": sub_data.get("files", []),
-                    "requirements": sub_data.get("requirements", ""),
-                }
-            return content, new_subtasks
-        # 有 JSON 但没有 subtasks，content 就是填充内容
-        if content:
-            return content, new_subtasks
-
-    # 纯文本输出（最常见的情况）
-    # 检查是否有 [SUBTASKS] 标记
-    subtask_match = re.search(
-        r'\[SUBTASKS\]\s*```(?:json)?\s*\n?(.*?)\n?\s*```',
-        response, re.DOTALL
-    )
-    if subtask_match:
-        try:
-            subtasks_data = json.loads(subtask_match.group(1).strip())
-            for sub_tid, sub_data in subtasks_data.items():
-                new_subtasks[sub_tid.lower()] = {
-                    "description": sub_data.get("description", ""),
-                    "files": sub_data.get("files", []),
-                    "requirements": sub_data.get("requirements", ""),
-                }
-            # 子任务标记前的文本作为父 task 内容
-            content = response[:subtask_match.start()].strip()
-            return content, new_subtasks
-        except:
-            pass
-
-    # 纯文本直接返回
-    return response.strip(), new_subtasks
-
-
-def _extract_json(text: str) -> Optional[dict]:
-    """从 AI 输出中提取 JSON"""
-    try:
-        return json.loads(text.strip())
-    except:
-        pass
-    match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1).strip())
-        except:
-            pass
-    return None

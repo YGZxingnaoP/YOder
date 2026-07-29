@@ -48,6 +48,7 @@ def run_phase1(
     thinking_callback: Optional[Callable] = None,
     progress_callback: Optional[Callable] = None,
     stop_check: Optional[Callable] = None,
+    stop_history: str = "",
 ) -> Phase1Result:
     """
     执行阶段一：大框架构建。
@@ -96,6 +97,7 @@ def run_phase1(
             file_list=file_list_text,
             file_preview=file_preview if file_preview else "(未选择文件)",
             history=history_text,
+            stop_history=stop_history if stop_history else "(无 stop 记录)",
         )}
     ]
 
@@ -229,8 +231,6 @@ def _parse_framework_output(response: str) -> tuple:
                 "requirements": tdata.get("requirements", ""),
                 "preset": tdata.get("preset", "mixed"),
                 "content": "",
-                "parent": tdata.get("parent", None),
-                "children": tdata.get("children", []),
                 "retry_count": 0,
                 "review_feedback": "",
             }
@@ -250,8 +250,6 @@ def _parse_framework_output(response: str) -> tuple:
                 "requirements": "",
                 "preset": "mixed",
                 "content": "",
-                "parent": None,
-                "children": [],
                 "retry_count": 0,
                 "review_feedback": "",
             }
@@ -314,12 +312,11 @@ def run_task_review(
         tasks = output_mgr.get_all_tasks()
         task_list_text = ""
         for tid, task in tasks.items():
-            if not task.get("parent"):
-                task_list_text += f"\n### {tid}\n"
-                task_list_text += f"描述: {task.get('description', '')}\n"
-                task_list_text += f"文件: {', '.join(task.get('files', []))}\n"
-                task_list_text += f"要求: {task.get('requirements', '')}\n"
-                task_list_text += f"预设: {task.get('preset', 'mixed')}\n"
+            task_list_text += f"\n### {tid}\n"
+            task_list_text += f"描述: {task.get('description', '')}\n"
+            task_list_text += f"文件: {', '.join(task.get('files', []))}\n"
+            task_list_text += f"要求: {task.get('requirements', '')}\n"
+            task_list_text += f"预设: {task.get('preset', 'mixed')}\n"
 
         sys_msg = PHASE1_TASKREVIEW_SYSTEM
         if system_prompt:
