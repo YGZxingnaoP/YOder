@@ -1,0 +1,7 @@
+﻿D:\YOder\env\python.exe : D:\YOder\env\python.exe: can't open file 'D:\\YOder\\func\\ui\\lib\\download_libs.py': [Errno 2] No such file or directory
+所在位置 行:1 字符: 1
++ D:\YOder\env\python.exe D:\YOder\func\ui\lib\download_libs.py 2>&1 |  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (D:\YOder\env\py...le or directory:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
