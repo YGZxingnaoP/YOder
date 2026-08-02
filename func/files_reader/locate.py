@@ -1,0 +1,43 @@
+import os
+from typing import Dict
+
+# 统一转为小写集合，实现大小写不敏感的过滤（Windows 兼容）
+IGNORE_DIRS = {
+    "__pycache__", ".git", ".svn", ".hg", "node_modules",
+    "env", "venv", ".env", ".venv", "runtime",
+    ".idea", ".vs", ".vscode", "dist", "build",
+    ".gradle", ".mvn", "target", ".ds_store",
+}
+
+def get_file_tree(folder_path: str) -> Dict:
+    if not os.path.isdir(folder_path):
+        raise NotADirectoryError(f"{folder_path} 不是有效目录")
+
+    def _build(path):
+        name = os.path.basename(path)
+        if os.path.isdir(path):
+            children = []
+            try:
+                items = sorted(os.listdir(path))
+            except PermissionError:
+                items = []
+            for item in items:
+                # 大小写不敏感：将目录名转为小写后再比对
+                if item.lower() in IGNORE_DIRS:
+                    continue
+                full = os.path.join(path, item)
+                children.append(_build(full))
+            return {
+                "name": name,
+                "type": "directory",
+                "path": os.path.abspath(path),
+                "children": children
+            }
+        else:
+            return {
+                "name": name,
+                "type": "file",
+                "path": os.path.abspath(path)
+            }
+
+    return _build(folder_path)

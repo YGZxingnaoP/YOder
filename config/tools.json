@@ -1,0 +1,44 @@
+{
+  "tools": [
+    {
+      "name": "read",
+      "enabled": true
+    },
+    {
+      "name": "write",
+      "enabled": true
+    },
+    {
+      "name": "edit",
+      "enabled": true
+    },
+    {
+      "name": "glob",
+      "enabled": true
+    },
+    {
+      "name": "grep",
+      "enabled": true
+    },
+    {
+      "name": "bash",
+      "enabled": true
+    },
+    {
+      "name": "web_search",
+      "enabled": true
+    },
+    {
+      "name": "web_browse",
+      "enabled": true
+    },
+    {
+      "name": "edge_check",
+      "enabled": true
+    },
+    {
+      "name": "todolist",
+      "enabled": true
+    }
+  ]
+}

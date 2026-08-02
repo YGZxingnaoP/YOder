@@ -1,0 +1,2019 @@
+/* 全局基础样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: rgba(0, 0, 0, 0.85);
+    background: #f0f0f5;
+    overflow: hidden;
+}
+
+/* WebGL背景（含CSS动画后备方案） */
+#webgl-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+}
+
+/* WebGL失败时显示CSS动画渐变 */
+#webgl-bg.css-fallback {
+    display: block !important;
+    background: linear-gradient(-45deg, #4a90d9, #9b59b6, #1abc9c, #e8a87c, #4a90d9);
+    background-size: 400% 400%;
+    animation: webgl-fallback-gradient 12s ease infinite;
+}
+
+@keyframes webgl-fallback-gradient {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* 自定义背景图片层 */
+#custom-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: none;
+}
+
+/* 主容器 */
+#app {
+    display: grid;
+    grid-template-columns: 40px minmax(180px, 280px) 1fr minmax(180px, 280px) 40px;
+    height: 100vh;
+    gap: 10px;
+    padding: 10px;
+    transition: grid-template-columns 0.3s ease;
+}
+
+/* 侧边栏折叠状态 */
+#app.left-collapsed {
+    grid-template-columns: 40px 0px 1fr minmax(180px, 280px) 40px;
+}
+
+#app.right-collapsed {
+    grid-template-columns: 40px minmax(180px, 280px) 1fr 0px 40px;
+}
+
+#app.left-collapsed.right-collapsed {
+    grid-template-columns: 40px 0px 1fr 0px 40px;
+}
+
+/* 侧边栏 */
+.sidebar {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: opacity 0.3s ease, width 0.3s ease;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.left-sidebar,
+.right-sidebar {
+    opacity: 1;
+    width: auto;
+    overflow: auto;
+    resize: horizontal;
+    min-width: 180px;
+    max-width: 450px;
+}
+
+/* 当侧边栏被折叠时隐藏内容 */
+#app.left-collapsed .left-sidebar,
+#app.right-collapsed .right-sidebar {
+    opacity: 0;
+    pointer-events: none;
+    padding: 0;
+    overflow: hidden;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: rgba(0, 0, 0, 0.9);
+}
+
+/* 侧边栏切换按钮 */
+.sidebar-toggle {
+    position: relative;
+    width: 30px;
+    height: 60px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.sidebar-toggle .toggle-icon {
+    font-size: 12px;
+    transition: transform 0.3s ease;
+}
+
+/* 对话列表 */
+.chat-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.chat-item {
+    padding: 10px 8px 10px 12px;
+    margin-bottom: 8px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.chat-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+.chat-item-actions {
+    display: none;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.chat-item:hover .chat-item-actions {
+    display: flex;
+}
+
+.chat-action-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.chat-action-btn:hover {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.chat-action-btn.delete-btn:hover {
+    background: rgba(255, 80, 80, 0.3);
+}
+
+.chat-rename-input {
+    flex: 1;
+    padding: 2px 6px;
+    border: 1px solid rgba(100, 150, 255, 0.5);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+    outline: none;
+    min-width: 0;
+}
+
+.chat-item:hover {
+    background: rgba(0, 0, 0, 0.08);
+    transform: translateX(5px);
+}
+
+.chat-item.active {
+    background: rgba(100, 150, 255, 0.2);
+}
+
+/* 文件列表 */
+.file-path-bar {
+    margin-bottom: 6px;
+}
+
+.file-path-bar input {
+    width: 100%;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    color: #333;
+    box-sizing: border-box;
+}
+
+.file-action-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.file-action-bar .file-action-btn {
+    flex: 1;
+    padding: 5px 0;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.file-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.file-item {
+    padding: 8px;
+    margin-bottom: 5px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.file-item:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+/* 主对话区 */
+#chat-main {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+    min-width: 300px;
+}
+
+#messages-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+#messages {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.message {
+    padding: 15px 25px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(10px);
+    line-height: 1.85;
+}
+
+.message.user {
+    background: rgba(100, 150, 255, 0.15);
+    align-self: flex-end;
+    max-width: 70%;
+}
+
+.message.assistant {
+    background: rgba(0, 0, 0, 0.04);
+    align-self: flex-start;
+    max-width: 85%;
+}
+
+/* TODOLIST面板 */
+.todolist-panel {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(15px);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 15px;
+    max-height: 400px;
+    min-height: 80px;
+    overflow-y: auto;
+    resize: vertical;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.panel-header h3 {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.9);
+}
+
+#todolist-progress {
+    color: rgba(50, 150, 50, 0.9);
+    font-weight: bold;
+}
+
+.todolist-item {
+    padding: 10px;
+    margin-bottom: 8px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.todolist-item.completed {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+.todolist-item .status-icon {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.todolist-item.completed .status-icon {
+    background: rgba(50, 150, 50, 0.8);
+    border-color: rgba(50, 150, 50, 0.8);
+}
+
+.todolist-item.in-progress .status-icon {
+    background: rgba(200, 150, 50, 0.8);
+    border-color: rgba(200, 150, 50, 0.8);
+}
+
+/* 输入区域 */
+#input-area {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(15px);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 15px;
+}
+
+.input-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    flex-wrap: wrap;
+}
+
+.toolbar-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    position: relative;
+}
+
+/* 按钮激活状态 */
+.toolbar-btn.active {
+    background: rgba(100, 150, 255, 0.25);
+    border-color: rgba(100, 150, 255, 0.6);
+    box-shadow: 0 0 8px rgba(100, 150, 255, 0.2);
+}
+
+.toolbar-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 6px;
+    background: rgba(50, 180, 50, 0.9);
+    border-radius: 50%;
+}
+
+.toolbar-btn .icon {
+    display: block;
+}
+
+.input-wrapper {
+    display: flex;
+    gap: 10px;
+}
+
+#message-input {
+    flex: 1;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
+    color: #333;
+    resize: both;
+    min-height: 60px;
+    max-height: 400px;
+    min-width: 200px;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+#message-input:focus {
+    outline: none;
+    border-color: rgba(100, 150, 255, 0.5);
+}
+
+#message-input::placeholder {
+    color: rgba(0, 0, 0, 0.35);
+}
+
+.send-btn {
+    padding: 12px 24px;
+    background: rgba(100, 150, 255, 0.2);
+    border: 1px solid rgba(100, 150, 255, 0.4);
+    color: #333;
+}
+
+.send-btn:hover {
+    background: rgba(100, 150, 255, 0.35);
+}
+
+.stop-btn {
+    padding: 12px 24px;
+    background: rgba(255, 80, 80, 0.2);
+    border: 1px solid rgba(255, 80, 80, 0.5);
+    color: #c33;
+    font-weight: 600;
+}
+
+.stop-btn:hover {
+    background: rgba(255, 80, 80, 0.35);
+}
+
+.attach-btn {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+/* 文件附件预览 */
+.file-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 0;
+}
+
+.file-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(100, 150, 255, 0.15);
+    border: 1px solid rgba(100, 150, 255, 0.3);
+    border-radius: 16px;
+    font-size: 12px;
+    color: #444;
+}
+
+.file-chip .remove-file {
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.6;
+    margin-left: 2px;
+}
+
+.file-chip .remove-file:hover {
+    opacity: 1;
+    color: #e55;
+}
+
+/* 文件树 */
+.file-tree-item {
+    padding: 6px 8px;
+    margin-bottom: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: inherit;
+}
+
+.file-tree-item:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.file-tree-item.directory {
+    font-weight: 500;
+}
+
+.file-tree-children {
+    padding-left: 16px;
+}
+
+/* 记忆概括卡片 */
+.memory-card {
+    padding: 12px;
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.memory-card .memory-index {
+    font-weight: 600;
+    font-size: 12px;
+    color: rgba(100, 150, 255, 0.9);
+    margin-bottom: 6px;
+}
+
+/* 消息中的文件附件 */
+.message-file-block {
+    background: rgba(100, 150, 255, 0.1);
+    border: 1px solid rgba(100, 150, 255, 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    margin: 8px 0;
+    font-size: 13px;
+}
+
+.message-file-block .file-header {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+/* 毛玻璃按钮 */
+.glass-btn {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.glass-btn:hover {
+    background: rgba(255, 255, 255, 0.9);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.glass-btn:active {
+    transform: translateY(0);
+}
+
+/* 毛玻璃卡片 */
+.glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* 弹窗 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    resize: both;
+    min-width: 300px;
+    min-height: 200px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+/* 代码块 */
+pre {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 15px;
+    border-radius: 8px;
+    overflow-x: auto;
+    position: relative;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+code {
+    font-family: 'Consolas', 'Monaco', monospace;
+    color: rgba(0, 0, 0, 0.85);
+}
+
+/* 行内代码 */
+p code, li code, td code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+/* ═══════════════════════════════════════════ */
+/* 工具记录侧边栏面板 */
+/* ═══════════════════════════════════════════ */
+
+.tool-records-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.tool-records-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 2px;
+}
+
+.tool-card {
+    margin-bottom: 10px;
+    border: 1px solid rgba(100, 150, 255, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.tool-card:hover {
+    border-color: rgba(100, 150, 255, 0.35);
+    box-shadow: 0 2px 8px rgba(100, 150, 255, 0.08);
+}
+
+.tool-card-header {
+    padding: 6px 10px;
+    background: rgba(100, 150, 255, 0.08);
+    font-weight: 600;
+    color: rgba(80, 120, 200, 0.9);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tool-card-header .tool-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(100, 150, 255, 0.15);
+    color: rgba(80, 120, 200, 0.8);
+    font-weight: 500;
+}
+
+/* 工具输入参数表格 */
+.tool-input-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.tool-input-table tr {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.tool-input-table td {
+    padding: 4px 8px;
+    vertical-align: top;
+}
+
+.tool-input-table .param-name {
+    color: rgba(80, 120, 200, 0.8);
+    font-weight: 500;
+    white-space: nowrap;
+    width: 1%;
+}
+
+.tool-input-table .param-value {
+    color: rgba(0, 0, 0, 0.75);
+    word-break: break-all;
+    font-family: 'Consolas', 'Monaco', monospace;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+/* 查看结果按钮 */
+.tool-result-btn {
+    display: block;
+    width: 100%;
+    padding: 5px 8px;
+    border: none;
+    background: rgba(0, 0, 0, 0.03);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 11px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+}
+
+.tool-result-btn:hover {
+    background: rgba(100, 150, 255, 0.08);
+    color: rgba(80, 120, 200, 0.8);
+}
+
+.tool-empty-state {
+    text-align: center;
+    padding: 20px 10px;
+    color: rgba(0, 0, 0, 0.35);
+    font-size: 12px;
+}
+
+/* ═══════════════════════════════════════════ */
+/* 工具输出弹窗 */
+/* ═══════════════════════════════════════════ */
+
+.tool-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.tool-modal-box {
+    width: 70%;
+    max-width: 800px;
+    max-height: 80vh;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 12px;
+    border: 1px solid rgba(100, 150, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tool-modal-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    font-size: 13px;
+    color: rgba(80, 120, 200, 0.9);
+}
+
+.tool-modal-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: rgba(0, 0, 0, 0.4);
+    padding: 0 4px;
+}
+
+.tool-modal-close:hover {
+    color: rgba(0, 0, 0, 0.8);
+}
+
+.tool-modal-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(0, 0, 0, 0.8);
+}
+
+/* 工具详情弹窗内部折叠区 */
+.tool-detail-section {
+    margin-bottom: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.tool-detail-summary {
+    padding: 8px 12px;
+    background: rgba(100, 150, 255, 0.06);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    color: rgba(80, 120, 200, 0.9);
+}
+
+.tool-detail-summary:hover {
+    background: rgba(100, 150, 255, 0.12);
+}
+
+.tool-detail-content {
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.7;
+    word-break: break-word;
+}
+
+.tool-detail-content p {
+    margin: 0 0 6px 0;
+}
+
+.tool-detail-result {
+    margin: 0;
+    padding: 10px 12px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.6;
+    color: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.02);
+}
+
+/* 暗色主题 — 工具记录面板 */
+#app.dark-theme .tool-card {
+    border-color: rgba(100, 150, 255, 0.2);
+}
+
+#app.dark-theme .tool-card-header {
+    background: rgba(100, 150, 255, 0.1);
+    color: rgba(150, 180, 255, 0.9);
+}
+
+#app.dark-theme .tool-card-header .tool-tag {
+    background: rgba(100, 150, 255, 0.15);
+    color: rgba(150, 180, 255, 0.8);
+}
+
+#app.dark-theme .tool-input-table tr {
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+#app.dark-theme .tool-input-table .param-name {
+    color: rgba(150, 180, 255, 0.8);
+}
+
+#app.dark-theme .tool-input-table .param-value {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+#app.dark-theme .tool-result-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.45);
+}
+
+#app.dark-theme .tool-result-btn:hover {
+    background: rgba(100, 150, 255, 0.12);
+    color: rgba(150, 180, 255, 0.8);
+}
+
+#app.dark-theme .tool-empty-state {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+#app.dark-theme .tool-detail-section {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.dark-theme .tool-detail-summary {
+    background: rgba(100, 150, 255, 0.08);
+    color: rgba(150, 180, 255, 0.9);
+}
+
+#app.dark-theme .tool-detail-summary:hover {
+    background: rgba(100, 150, 255, 0.15);
+}
+
+#app.dark-theme .tool-detail-content {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#app.dark-theme .tool-detail-result {
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+#app.dark-theme .tool-modal-box {
+    background: rgba(30, 30, 40, 0.95);
+    border-color: rgba(100, 150, 255, 0.25);
+}
+
+#app.dark-theme .tool-modal-header {
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(150, 180, 255, 0.9);
+}
+
+#app.dark-theme .tool-modal-close {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#app.dark-theme .tool-modal-close:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#app.dark-theme .tool-modal-body {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* 自定义壁纸 — 工具记录面板 */
+#app.custom-wallpaper .tool-card {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.custom-wallpaper .tool-card-header {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(180, 200, 255, 0.9);
+}
+
+#app.custom-wallpaper .tool-input-table tr {
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+#app.custom-wallpaper .tool-input-table .param-value {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+#app.custom-wallpaper .tool-result-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.45);
+}
+
+#app.custom-wallpaper .tool-result-btn:hover {
+    background: rgba(100, 150, 255, 0.12);
+}
+
+#app.custom-wallpaper .tool-empty-state {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* 亮色壁纸变体 */
+#app.custom-wallpaper.wp-light .tool-card {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+#app.custom-wallpaper.wp-light .tool-card-header {
+    background: rgba(100, 150, 255, 0.08);
+    color: rgba(80, 120, 200, 0.9);
+}
+
+#app.custom-wallpaper.wp-light .tool-input-table tr {
+    border-color: rgba(0, 0, 0, 0.04);
+}
+
+#app.custom-wallpaper.wp-light .tool-input-table .param-value {
+    color: rgba(0, 0, 0, 0.75);
+}
+
+#app.custom-wallpaper.wp-light .tool-result-btn {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.05);
+    color: rgba(0, 0, 0, 0.5);
+}
+
+#app.custom-wallpaper.wp-light .tool-result-btn:hover {
+    background: rgba(100, 150, 255, 0.08);
+}
+
+#app.custom-wallpaper.wp-light .tool-empty-state {
+    color: rgba(0, 0, 0, 0.35);
+}
+
+/* 设置表单 */
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.settings-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.settings-form label {
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.85);
+}
+
+.settings-form input,
+.settings-form select {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
+    color: #333;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+
+/* select 浅色主题 */
+.settings-form select {
+    appearance: auto;
+    -webkit-appearance: auto;
+    background-image: none;
+    padding-right: 12px;
+}
+
+.settings-form select option {
+    background: #ffffff;
+    color: #333;
+    padding: 8px;
+}
+
+.settings-form select option:hover,
+.settings-form select option:focus {
+    background: rgba(100, 150, 255, 0.15);
+}
+
+.settings-form input:focus,
+.settings-form select:focus {
+    border-color: rgba(100, 150, 255, 0.5);
+}
+
+.settings-form input[type="range"] {
+    padding: 0;
+    accent-color: rgba(100, 150, 255, 0.8);
+}
+
+.settings-form small {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.5);
+}
+
+.settings-form input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+    accent-color: rgba(100, 150, 255, 0.8);
+}
+
+/* 工具箱 */
+.tool-section {
+    margin-bottom: 20px;
+}
+
+.tool-section h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.9);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.tool-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tool-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.tool-item:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.tool-item .tool-name {
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.85);
+    min-width: 80px;
+}
+
+.tool-item .tool-desc {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.5);
+    flex: 1;
+}
+
+/* 工具开关 */
+.tool-toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.3s;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.tool-toggle.active {
+    background: rgba(100, 150, 255, 0.7);
+}
+
+.tool-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.tool-toggle.active::after {
+    transform: translateX(18px);
+}
+
+/* 壁纸设置 */
+.wallpaper-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.wallpaper-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.wallpaper-option:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.wallpaper-option.active {
+    border-color: rgba(100, 150, 255, 0.8);
+    background: rgba(100, 150, 255, 0.08);
+}
+
+.wallpaper-preview {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: rgba(0, 0, 0, 0.5);
+}
+
+.webgl-preview {
+    background: linear-gradient(135deg, #4a90d9, #9b59b6, #1abc9c);
+}
+
+.dark-preview {
+    background: #1a1a2e;
+}
+
+.custom-preview {
+    background: rgba(0, 0, 0, 0.05);
+    border: 2px dashed rgba(0, 0, 0, 0.2);
+}
+
+.wallpaper-option span {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.8);
+}
+
+/* 侧边栏标签 */
+.sidebar-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    color: rgba(0, 0, 0, 0.9);
+}
+
+.tab-btn.active {
+    background: rgba(100, 150, 255, 0.2);
+    color: rgba(0, 0, 0, 0.9);
+}
+
+.tab-panel {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.tab-panel.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 空状态 */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    color: rgba(0, 0, 0, 0.5);
+    flex: 1;
+}
+
+.empty-state span {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.empty-state p {
+    font-size: 16px;
+    margin-bottom: 8px;
+    color: rgba(0, 0, 0, 0.7);
+}
+
+.empty-state small {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.35);
+}
+
+/* 右侧边栏内部布局 */
+.right-sidebar {
+    padding: 12px;
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+    #app {
+        grid-template-columns: 40px 0px 1fr 0px 40px;
+    }
+    
+    .left-sidebar,
+    .right-sidebar {
+        display: none;
+    }
+}
+
+/* ═══════════════════════════════════════════ */
+/* 暗色主题（dark壁纸模式） */
+/* ═══════════════════════════════════════════ */
+
+body:has(#app.dark-theme) {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.dark-theme .sidebar {
+    background: rgba(30, 30, 50, 0.75);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+#app.dark-theme .sidebar-header h2 {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#app.dark-theme .sidebar-header {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.dark-theme .sidebar-toggle {
+    background: rgba(30, 30, 50, 0.75);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #ccc;
+}
+
+#app.dark-theme .sidebar-toggle:hover {
+    background: rgba(40, 40, 70, 0.9);
+}
+
+#app.dark-theme .chat-item {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.dark-theme .chat-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#app.dark-theme .chat-item.active {
+    background: rgba(100, 150, 255, 0.25);
+}
+
+#app.dark-theme #chat-main {
+    background: rgba(20, 20, 40, 0.5);
+}
+
+#app.dark-theme .message.user {
+    background: rgba(60, 80, 160, 0.6);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#app.dark-theme .message.assistant {
+    background: rgba(40, 40, 60, 0.6);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.dark-theme .glass-btn {
+    background: rgba(60, 60, 100, 0.5);
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.dark-theme .glass-btn:hover {
+    background: rgba(80, 80, 130, 0.6);
+}
+
+#app.dark-theme .glass-card,
+#app.dark-theme .modal-content {
+    background: rgba(30, 30, 55, 0.9);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.dark-theme .settings-form label {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.dark-theme .settings-form input,
+#app.dark-theme .settings-form select {
+    background: rgba(40, 40, 70, 0.7);
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.dark-theme .settings-form small {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#app.dark-theme .empty-state p,
+#app.dark-theme .empty-state small {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#app.dark-theme .file-path-bar input {
+    background: rgba(40, 40, 70, 0.7);
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.dark-theme .file-item {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.dark-theme .file-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#app.dark-theme .todolist-panel {
+    background: rgba(25, 25, 45, 0.7);
+}
+
+#app.dark-theme .panel-header h3 {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#app.dark-theme .tab-btn {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#app.dark-theme .tab-btn.active {
+    color: rgba(255, 255, 255, 0.9);
+    border-bottom-color: rgba(100, 150, 255, 0.6);
+}
+
+#app.dark-theme #message-input {
+    background: rgba(30, 30, 55, 0.7);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 暗色主题 — 代码块 */
+#app.dark-theme pre {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+#app.dark-theme code {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.dark-theme p code,
+#app.dark-theme li code,
+#app.dark-theme td code {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* ═══════════════════════════════════════════ */
+/* 自定义壁纸模式 — 面板半透明，显示背景图 */
+/* --wp-blur: 模糊度(默认8px，可在壁纸设置中调节) */
+/* ═══════════════════════════════════════════ */
+
+:root {
+    --wp-blur: 8px;
+}
+
+#app.custom-wallpaper .sidebar {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(var(--wp-blur));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 0.04),
+        0 2px 16px rgba(0, 0, 0, 0.25);
+}
+
+#app.custom-wallpaper .sidebar-header h2,
+#app.custom-wallpaper .panel-header h3 {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#app.custom-wallpaper .sidebar-header {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.custom-wallpaper .sidebar-toggle {
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #ddd;
+}
+
+#app.custom-wallpaper .sidebar-toggle:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+#app.custom-wallpaper #chat-main {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(var(--wp-blur));
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow:
+        inset 0 0 6px rgba(255, 255, 255, 0.03),
+        0 2px 16px rgba(0, 0, 0, 0.2);
+}
+
+#app.custom-wallpaper .message.user {
+    background: rgba(60, 80, 160, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#app.custom-wallpaper .message.assistant {
+    background: rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.custom-wallpaper .glass-btn {
+    background: rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.03);
+}
+
+#app.custom-wallpaper .glass-btn:hover {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+#app.custom-wallpaper #input-area {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(var(--wp-blur));
+    border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.custom-wallpaper #message-input {
+    background: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* 自定义壁纸 — 代码块（毛玻璃底色，确保可读性） */
+#app.custom-wallpaper pre {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(12px);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+#app.custom-wallpaper code {
+    color: rgba(255, 255, 255, 0.88);
+}
+
+#app.custom-wallpaper p code,
+#app.custom-wallpaper li code,
+#app.custom-wallpaper td code {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(6px);
+}
+
+/* 亮色壁纸模式（自动检测） */
+#app.custom-wallpaper.wp-light pre {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+#app.custom-wallpaper.wp-light code {
+    color: rgba(0, 0, 0, 0.85);
+}
+
+#app.custom-wallpaper.wp-light p code,
+#app.custom-wallpaper.wp-light li code,
+#app.custom-wallpaper.wp-light td code {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+#app.custom-wallpaper.wp-light .sidebar {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+#app.custom-wallpaper.wp-light #chat-main {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+#app.custom-wallpaper.wp-light .message.assistant {
+    background: rgba(255, 255, 255, 0.5);
+    color: rgba(0, 0, 0, 0.85);
+}
+
+#app.custom-wallpaper.wp-light .message.user {
+    background: rgba(100, 150, 255, 0.25);
+    color: rgba(0, 0, 0, 0.9);
+}
+
+#app.custom-wallpaper.wp-light .glass-btn {
+    background: rgba(255, 255, 255, 0.5);
+    color: rgba(0, 0, 0, 0.85);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+#app.custom-wallpaper.wp-light .glass-btn:hover {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+#app.custom-wallpaper.wp-light #input-area {
+    background: rgba(255, 255, 255, 0.55);
+    border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+#app.custom-wallpaper.wp-light #message-input {
+    background: rgba(255, 255, 255, 0.6);
+    color: rgba(0, 0, 0, 0.9);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+#app.custom-wallpaper.wp-light #message-input::placeholder {
+    color: rgba(0, 0, 0, 0.35);
+}
+
+#app.custom-wallpaper.wp-light .sidebar-header h2,
+#app.custom-wallpaper.wp-light .panel-header h3 {
+    color: rgba(0, 0, 0, 0.9);
+}
+
+#app.custom-wallpaper.wp-light .sidebar-toggle {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #333;
+}
+
+#app.custom-wallpaper.wp-light .chat-item {
+    background: rgba(0, 0, 0, 0.04);
+    color: rgba(0, 0, 0, 0.85);
+}
+
+#app.custom-wallpaper.wp-light .chat-item:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+#app.custom-wallpaper.wp-light .chat-item.active {
+    background: rgba(100, 150, 255, 0.2);
+}
+
+#app.custom-wallpaper.wp-light .todolist-panel {
+    background: rgba(255, 255, 255, 0.55);
+    border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+#app.custom-wallpaper.wp-light .tab-btn {
+    color: rgba(0, 0, 0, 0.45);
+}
+
+#app.custom-wallpaper.wp-light .tab-btn.active {
+    color: rgba(0, 0, 0, 0.9);
+    background: rgba(100, 150, 255, 0.15);
+}
+
+#app.custom-wallpaper.wp-light .thinking-content {
+    color: rgba(0, 0, 0, 0.55);
+}
+
+#app.custom-wallpaper.wp-light .thinking-block {
+    border-color: rgba(100, 150, 255, 0.15);
+    background: rgba(100, 150, 255, 0.04);
+}
+
+body:has(#app.custom-wallpaper.wp-light) {
+    color: rgba(0, 0, 0, 0.85);
+}
+
+#app.custom-wallpaper #message-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#app.custom-wallpaper .send-btn {
+    background: rgba(100, 150, 255, 0.3);
+    border-color: rgba(100, 150, 255, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#app.custom-wallpaper .chat-item {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.custom-wallpaper .chat-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+#app.custom-wallpaper .chat-item.active {
+    background: rgba(100, 150, 255, 0.3);
+}
+
+#app.custom-wallpaper .todolist-panel {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(var(--wp-blur));
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow:
+        inset 0 2px 6px rgba(255, 255, 255, 0.03),
+        0 -1px 8px rgba(0, 0, 0, 0.15);
+}
+
+#app.custom-wallpaper .tab-btn {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#app.custom-wallpaper .tab-btn.active {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(100, 150, 255, 0.2);
+}
+
+#app.custom-wallpaper .file-path-bar input {
+    background: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+#app.custom-wallpaper .file-item {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.custom-wallpaper .file-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+#app.custom-wallpaper .settings-form label {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#app.custom-wallpaper .settings-form input,
+#app.custom-wallpaper .settings-form select {
+    background: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+#app.custom-wallpaper .settings-form small {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#app.custom-wallpaper .empty-state,
+#app.custom-wallpaper .empty-state p,
+#app.custom-wallpaper .empty-state small {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+body:has(#app.custom-wallpaper) {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* ═══════════════════════════════════════════ */
+/* 单轮删除按钮 */
+/* ═══════════════════════════════════════════ */
+
+.round-delete-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    background: rgba(255, 80, 80, 0.15);
+    border-radius: 4px;
+    color: rgba(255, 80, 80, 0.7);
+    cursor: pointer;
+    font-size: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    line-height: 1;
+}
+
+.message.user {
+    position: relative;
+}
+
+.message.user:hover .round-delete-btn {
+    display: flex;
+}
+
+.round-delete-btn:hover {
+    background: rgba(255, 80, 80, 0.35);
+    color: #c33;
+}
+
+/* ═══════════════════════════════════════════ */
+/* 记忆概括控制面板 */
+/* ═══════════════════════════════════════════ */
+
+.memory-controls {
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.memory-toggle-row {
+    display: flex;
+    align-items: center;
+}
+
+.memory-toggle-row label {
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.memory-toggle-row input[type="checkbox"] {
+    accent-color: rgba(100, 150, 255, 0.8);
+    width: 16px;
+    height: 16px;
+}
+
+.memory-info-row {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.6);
+    flex-wrap: wrap;
+}
+
+.memory-info-row b {
+    color: rgba(100, 150, 255, 0.9);
+}
+
+.memory-chars-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.memory-chars-row input {
+    padding: 4px 6px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.memory-summarize-btn {
+    width: 100%;
+    padding: 8px 16px;
+    background: rgba(100, 150, 255, 0.15);
+    border: 1px solid rgba(100, 150, 255, 0.3);
+    color: rgba(50, 100, 200, 0.9);
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.memory-summarize-btn:hover:not(:disabled) {
+    background: rgba(100, 150, 255, 0.25);
+}
+
+.memory-summarize-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ═══════════════════════════════════════════ */
+/* 思考内容折叠块 */
+/* ═══════════════════════════════════════════ */
+
+.thinking-block {
+    margin-bottom: 10px;
+    border: 1px solid rgba(100, 150, 255, 0.15);
+    border-radius: 8px;
+    background: rgba(100, 150, 255, 0.04);
+    overflow: hidden;
+}
+
+.thinking-summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(100, 150, 255, 0.8);
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.thinking-summary::-webkit-details-marker {
+    display: none;
+}
+
+.thinking-summary::before {
+    content: '▶';
+    font-size: 10px;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+
+details[open] > .thinking-summary::before {
+    transform: rotate(90deg);
+}
+
+.thinking-content {
+    padding: 8px 12px 12px;
+    border-top: 1px solid rgba(100, 150, 255, 0.1);
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(0, 0, 0, 0.55);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.thinking-content p {
+    margin-bottom: 6px;
+}
+
+.thinking-loading {
+    display: inline-block;
+    animation: thinking-pulse 1.4s infinite;
+    font-size: 16px;
+    letter-spacing: 3px;
+}
+
+@keyframes thinking-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+/* 暗色主题适配 */
+#app.dark-theme .thinking-block {
+    border-color: rgba(100, 150, 255, 0.2);
+    background: rgba(100, 150, 255, 0.06);
+}
+
+#app.dark-theme .thinking-content {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+#app.custom-wallpaper .thinking-block {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+#app.custom-wallpaper .thinking-content {
+    color: rgba(255, 255, 255, 0.45);
+}
