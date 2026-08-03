@@ -36,12 +36,22 @@ class BaseTool(ABC):
     def is_path_allowed(self, abs_path: str) -> bool:
         """检查绝对路径是否在允许范围内（项目根目录或额外允许的文件夹）"""
         import os
+
+        def _contains(container: str, path: str) -> bool:
+            """判断 container 是否包含 path（处理根目录末尾分隔符）"""
+            # 精确匹配
+            if path == container:
+                return True
+            # 统一去掉末尾分隔符后再拼接，避免 "D:\" + "\" = "D:\\" 的问题
+            base = container.rstrip(os.sep)
+            return path.startswith(base + os.sep)
+
         # 检查项目根目录
-        if abs_path == self.project_root or abs_path.startswith(self.project_root + os.sep):
+        if _contains(self.project_root, abs_path):
             return True
         # 检查额外允许的文件夹
         for folder in self.allowed_folders:
-            if abs_path == folder or abs_path.startswith(folder + os.sep):
+            if _contains(folder, abs_path):
                 return True
         return False
     

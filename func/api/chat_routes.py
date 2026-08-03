@@ -250,12 +250,10 @@ async def chat(request: ChatRequest):
 
             system_msg = {"role": "system", "content": "\n".join(system_prompt_parts)}
 
-            # 2.6 设置加载的文件夹为工具额外允许访问的目录
-            loaded_folder_abs = os.path.abspath(loaded_folder) if loaded_folder and os.path.isdir(loaded_folder) else None
-            # 无加载文件夹时使用当前工作目录作为允许访问的目录
-            fallback_allowed = [loaded_folder_abs] if loaded_folder_abs else [project_root]
+            # 2.6 设置工具允许访问的目录范围
+            # 始终允许访问整个 D:\ 盘，加载文件夹只是工作目录，不是访问限制
             for tool in tool_reg.get_all().values():
-                tool.allowed_folders = fallback_allowed
+                tool.allowed_folders = ["D:\\"]
 
             # 3. 加载对话历史
             chat_file = os.path.join(BASE_DIR, "records", request.chat_id, "chat.json")
