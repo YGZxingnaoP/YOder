@@ -201,8 +201,17 @@ async def chat(request: ChatRequest):
 
             # 2.5 构建系统提示词（项目路径+OS+加载文件夹）
             os_info = f"{_platform.system()} {_platform.release()} ({_platform.machine()})"
-            project_root = BASE_DIR
             loaded_folder = request.loaded_folder or ""
+
+            # 动态更新工具系统的工作目录
+            tool_reg = config.tool_registry
+            if loaded_folder and os.path.isdir(loaded_folder):
+                tool_reg.update_project_root(os.path.abspath(loaded_folder))
+            else:
+                tool_reg.update_project_root("D:\\")
+
+            # 使用更新后的工作目录作为 project_root
+            project_root = tool_reg.project_root
 
             system_prompt_parts = [
                 f"你是一个AI编程助手，运行在 {os_info} 系统上。",
@@ -215,7 +224,7 @@ async def chat(request: ChatRequest):
                 system_prompt_parts.append(f"请使用该文件夹内的相对路径来引用文件，工具调用时优先使用相对于 {loaded_folder} 的路径。")
             else:
                 system_prompt_parts.append(f"\n[当前工作目录]")
-                system_prompt_parts.append(f"bash工具的默认工作目录为 D:\\，执行命令时将自动在该目录下执行。")
+                system_prompt_parts.append(f"bash工具的默认工作目录为 {project_root}，执行命令时将自动在该目录下执行。没有加载文件夹时，所有文件操作限定在 {project_root} 内。")
             system_prompt_parts.append("当使用工具操作文件时，请使用绝对路径或相对于工作目录的路径。")
             system_prompt_parts.append("\n[bash工具环境说明]")
             system_prompt_parts.append("bash工具在Windows下使用 cmd.exe 执行命令，请使用cmd语法（如 dir /b /ad、type、findstr 等），不要使用PowerShell语法（如 Get-ChildItem、Select-Object 等）。")
@@ -243,9 +252,8 @@ async def chat(request: ChatRequest):
 
             # 2.6 设置加载的文件夹为工具额外允许访问的目录
             loaded_folder_abs = os.path.abspath(loaded_folder) if loaded_folder and os.path.isdir(loaded_folder) else None
-            tool_reg = config.tool_registry
-            # 无加载文件夹时允许D盘根目录（bash默认工作目录）
-            fallback_allowed = [loaded_folder_abs] if loaded_folder_abs else ["D:\\"]
+            # 无加载文件夹时使用当前工作目录作为允许访问的目录
+            fallback_allowed = [loaded_folder_abs] if loaded_folder_abs else [project_root]
             for tool in tool_reg.get_all().values():
                 tool.allowed_folders = fallback_allowed
 

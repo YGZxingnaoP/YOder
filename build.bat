@@ -211,16 +211,7 @@ echo [5/5] Building exe (this may take a few minutes)...
     --hidden-import=idna ^
     --hidden-import=trafilatura ^
     --hidden-import=selenium ^
-    --hidden-import=selenium.webdriver ^
-    --hidden-import=selenium.webdriver.edge ^
-    --hidden-import=selenium.webdriver.edge.service ^
-    --hidden-import=selenium.webdriver.edge.options ^
-    --hidden-import=selenium.webdriver.common ^
-    --hidden-import=selenium.webdriver.common.by ^
-    --hidden-import=selenium.webdriver.common.keys ^
-    --hidden-import=selenium.webdriver.support ^
-    --hidden-import=selenium.webdriver.support.ui ^
-    --hidden-import=selenium.webdriver.support.expected_conditions ^
+    --collect-all selenium ^
     --hidden-import=fitz ^
     --hidden-import=docx ^
     --hidden-import=multipart ^

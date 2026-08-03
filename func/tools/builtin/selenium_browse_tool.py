@@ -58,19 +58,19 @@ class SeleniumBrowseTool(BaseTool):
           2. 系统 PATH
         """
         search_dirs = []
-        
+    
         # 0. frozen 环境: 优先 exe 所在目录
         if getattr(sys, 'frozen', False):
             exe_dir = os.path.dirname(sys.executable)
             search_dirs.append(exe_dir)
-        
+    
         # 1. project_root（非空且不与 exe_dir 重复）
         if self.project_root and self.project_root not in search_dirs:
             search_dirs.append(self.project_root)
-        
+    
         # 2. 系统 PATH
         search_dirs.extend(os.environ.get("PATH", "").split(os.pathsep))
-        
+    
         for d in search_dirs:
             d = d.strip()
             if not d:
@@ -78,7 +78,7 @@ class SeleniumBrowseTool(BaseTool):
             driver = os.path.join(d, "msedgedriver.exe")
             if os.path.exists(driver):
                 return driver
-        
+    
         return ""
     
     def execute(self, arguments: Dict[str, Any]) -> str:

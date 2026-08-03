@@ -158,3 +158,14 @@ class ToolRegistry:
         tool.enabled = enabled
         self.save_config()
         return True
+
+    def update_project_root(self, new_root: str) -> None:
+        """
+        动态更新所有已注册工具的 project_root（切换工作目录时调用）。
+        
+        Args:
+            new_root: 新的项目根目录绝对路径
+        """
+        self.project_root = new_root
+        for tool in self._tools.values():
+            tool.project_root = new_root

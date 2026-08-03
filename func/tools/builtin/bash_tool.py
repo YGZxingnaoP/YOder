@@ -147,15 +147,15 @@ class BashTool(BaseTool):
         # 6. 设置工作目录
         if working_dir:
             if not os.path.isabs(working_dir):
-                base = self.allowed_folders[0] if getattr(self, 'allowed_folders', None) and self.allowed_folders[0] else "D:\\"
+                base = self.allowed_folders[0] if getattr(self, 'allowed_folders', None) and self.allowed_folders[0] else self.project_root
                 working_dir = os.path.join(base, working_dir)
             cwd = os.path.abspath(working_dir)
         else:
-            # 默认使用加载的文件夹（如果有），否则使用D盘根目录
+            # 默认使用加载的文件夹（如果有），否则使用 project_root
             if getattr(self, 'allowed_folders', None) and self.allowed_folders[0]:
                 cwd = self.allowed_folders[0]
             else:
-                cwd = "D:\\"
+                cwd = self.project_root or "."
         
         # 路径验证
         if not self.is_path_allowed(cwd):
