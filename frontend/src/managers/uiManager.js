@@ -633,7 +633,10 @@ export class UIManager {
             html += `<div style="margin-bottom:10px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08);">`;
             html += `<div style="font-weight:600; margin-bottom:4px;">WebDriver: ${dName}</div>`;
             if (data.webdriver_installed) {
-                html += `<div style="color:#2a2;">✅ WebDriver 已安装</div>`;
+                html += `<div style="color:#2a2;">✅ WebDriver 已安装${data.webdriver_version ? ` (版本: ${data.webdriver_version})` : ''}</div>`;
+            } else if (data.webdriver_version) {
+                html += `<div style="color:#c80;">⚠️ 版本不匹配: 检测到 ${data.webdriver_version}，浏览器需要 ${data.version}</div>`;
+                html += `<div style="font-size:12px; opacity:0.7; margin-top:4px;">请下载与浏览器版本匹配的 WebDriver 替换现有文件</div>`;
             } else {
                 html += `<div style="color:#c80;">⚠️ WebDriver 未检测到</div>`;
                 html += `<div style="font-size:12px; opacity:0.7; margin-top:4px;">将 ${dName} 放入项目目录或添加到系统 PATH</div>`;

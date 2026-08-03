@@ -48,29 +48,28 @@ class SeleniumBrowseTool(BaseTool):
     
     def __init__(self, project_root: str = ""):
         super().__init__(project_root)
-        self.driver_path = self._find_webdriver()
-    
+        self.driver_path = ""
+
     def _find_webdriver(self) -> str:
         """查找WebDriver路径
-        优先级:
-          0. PyInstaller frozen: exe 同级目录（dist/ 下）
-          1. project_root 目录
-          2. 系统 PATH
+        exe 模式：exe 同级目录（必须）+ project_root（如果不同）
+        dev 模式：project_root + 系统 PATH
         """
         search_dirs = []
-    
-        # 0. frozen 环境: 优先 exe 所在目录
+
         if getattr(sys, 'frozen', False):
             exe_dir = os.path.dirname(sys.executable)
             search_dirs.append(exe_dir)
-    
-        # 1. project_root（非空且不与 exe_dir 重复）
-        if self.project_root and self.project_root not in search_dirs:
-            search_dirs.append(self.project_root)
-    
-        # 2. 系统 PATH
-        search_dirs.extend(os.environ.get("PATH", "").split(os.pathsep))
-    
+            # exe 模式下也检查 project_root（如果不同于 exe_dir）
+            if self.project_root and os.path.normcase(self.project_root) != os.path.normcase(exe_dir):
+                search_dirs.append(self.project_root)
+        else:
+            # dev 模式：project_root
+            if self.project_root:
+                search_dirs.append(self.project_root)
+            # dev 模式：系统 PATH
+            search_dirs.extend(os.environ.get("PATH", "").split(os.pathsep))
+
         for d in search_dirs:
             d = d.strip()
             if not d:
@@ -78,8 +77,14 @@ class SeleniumBrowseTool(BaseTool):
             driver = os.path.join(d, "msedgedriver.exe")
             if os.path.exists(driver):
                 return driver
-    
+
         return ""
+
+    def _ensure_driver(self) -> str:
+        """确保 driver_path 已解析，每次调用时重新查找（应对 project_root 动态变化）"""
+        if not self.driver_path:
+            self.driver_path = self._find_webdriver()
+        return self.driver_path
     
     def execute(self, arguments: Dict[str, Any]) -> str:
         """执行Selenium网页浏览"""
@@ -95,15 +100,17 @@ class SeleniumBrowseTool(BaseTool):
         if not url.startswith(("http://", "https://")):
             return "错误: URL必须以 http:// 或 https:// 开头"
         
+        # 动态查找 driver（应对 project_root 变化）
+        self._ensure_driver()
+
         if not self.driver_path:
             return (
                 "错误: 未找到 msedgedriver.exe\n"
-                "解决方法:\n"
-                "1. 下载与Edge版本匹配的WebDriver\n"
-                "2. 将msedgedriver.exe放入项目根目录或系统PATH\n"
-                "3. 使用edge_check工具检测浏览器环境"
+                "请告知用户: 在设置面板的「网页分析」中点击「检测浏览器环境」，"
+                "根据检测结果下载对应版本并放在正确位置。"
+                "不要自行下载或安装任何驱动。"
             )
-        
+
         try:
             from selenium import webdriver
             from selenium.webdriver.edge.options import Options
@@ -113,8 +120,8 @@ class SeleniumBrowseTool(BaseTool):
             from selenium.webdriver.support import expected_conditions as EC
         except ImportError:
             return (
-                "错误: selenium未安装\n"
-                "请运行: pip install selenium>=4.0"
+                "错误: selenium 库未正确安装\n"
+                "请告知用户: 此问题需要重新构建项目，不要自行运行 pip install。"
             )
         
         # 配置浏览器选项
