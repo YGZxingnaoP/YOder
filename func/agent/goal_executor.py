@@ -183,17 +183,10 @@ class GoalExecutor:
                 messages.append(assistant_msg)
                 messages.extend(tool_messages)
                 
-                # 检查TODOLIST完成状态
-                todolist_tool = self.tool_registry.get("todolist")
-                if todolist_tool:
-                    try:
-                        completion = todolist_tool.check_completion()
-                        if completion.get("completed") and completion.get("total", 0) > 0:
-                            # TODOLIST全部完成, 退出循环
-                            break
-                    except Exception:
-                        pass
-                
+                # 检查TODOLIST完成状态（仅记录，不打断循环）
+                # 不在此处 break：AI 标记完成后还需要下一轮才能输出最终内容。
+                # 自然流程：AI 下一轮无 tool_calls → else 分支 → break 并输出最终回复。
+                # 如果 AI 继续调用工具，说明它判断还需要更多信息，尊重其判断。
                 continue
             else:
                 # 无工具调用 → 最终响应
