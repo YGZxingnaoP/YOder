@@ -74,7 +74,18 @@ export class ChatManager {
                 for (let i = 0; i < messages.length; i++) {
                     const msg = messages[i];
                     if (msg.role === 'user') {
-                        this.uiManager.addMessage(msg.content || '', msg.role, roundIdx);
+                        // 处理旧格式（content 内含文件文本）的兼容：如有 files 则用卡片模式，否则回退原始显示
+                        const hasFilesField = (msg.files_full && msg.files_full.length > 0) || (msg.files && msg.files.length > 0);
+                        if (hasFilesField) {
+                            const userFiles = (msg.files_full || msg.files || []).map(f => ({
+                                name: f.name || '?',
+                                size: f.size || 0,
+                                content: f.content || ''
+                            }));
+                            this.uiManager.addUserMessageWithFiles(msg.content || '', userFiles, roundIdx);
+                        } else {
+                            this.uiManager.addMessage(msg.content || '', msg.role, roundIdx);
+                        }
                         roundIdx++;
                     } else if (msg.role === 'assistant') {
                         let displayContent = msg.content || '';
@@ -168,25 +179,19 @@ export class ChatManager {
             await window.app?.saveFilesToRecord();
         }
         
-        // 构建显示给用户的消息（含文件）
-        let displayContent = message;
+        // 构建发送给后端的数据（文本和文件分离，不再拼入消息体）
+        let backendFiles = [];
         if (files.length > 0) {
-            const fileList = files.map(f => f.name).join('\n');
-            displayContent = message ? `${message}\n${fileList}` : fileList;
+            backendFiles = files.map(f => ({
+                name: f.name,
+                size: f.size,
+                content: f.content || ''
+            }));
         }
         
-        // 显示用户消息
+        // 显示用户消息：文本在气泡中，文件以卡片展示
         const currentRoundIndex = document.querySelectorAll('.message.user').length;
-        this.uiManager.addMessage(displayContent, 'user', currentRoundIndex);
-        
-        // 构建发送给后端的消息（包含文件内容）
-        let fullMessage = message;
-        if (files.length > 0) {
-            const fileSection = files.map(f => 
-                `\n\n[文件名称: ${f.name}]\n[文件大小: ${f.size}B]\n--- 文件内容开始 ---\n${f.content}\n--- 文件内容结束 ---`
-            ).join('');
-            fullMessage = message ? `${message}${fileSection}` : fileSection.trim();
-        }
+        this.uiManager.addUserMessageWithFiles(message, files, currentRoundIndex);
         
         try {
             // 获取禁用的工具列表
@@ -197,13 +202,14 @@ export class ChatManager {
             this.isStreaming = true;
             this.updateStopButton(true);
             
-            // 发送到后端（携带工具开关状态）
+            // 发送到后端（文本与文件分离）
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_id: this.currentChatId,
-                    message: fullMessage,
+                    message: message,         // 仅用户输入的文本
+                    files: backendFiles,       // 文件单独发送
                     tools_enabled: this.configManager.get('tools_enabled') !== false,
                     disabled_tools: disabledTools,
                     loaded_folder: loadedFolder || ''

@@ -35,6 +35,7 @@ class ChatRequest(BaseModel):
     disabled_tools: List[str] = []
     agent_mode: str = ""
     loaded_folder: Optional[str] = None  # 前端加载的文件夹路径
+    files: List[dict] = []  # 附件: [{"name":"x.py","size":1234,"content":"..."}]
 
 
 class SummarizeRequest(BaseModel):

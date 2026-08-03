@@ -82,6 +82,109 @@ export class UIManager {
         return messageDiv;
     }
     
+    /**
+     * 用户消息（含文件附件卡片）
+     * @param {string} text - 用户输入的文本
+     * @param {Array} files - [{name, size, content}]
+     * @param {number} roundIndex
+     */
+    addUserMessageWithFiles(text, files, roundIndex) {
+        const messagesDiv = document.getElementById('messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message user';
+        
+        let html = '';
+        if (text) {
+            html += `<div class="message-content">${marked(text)}</div>`;
+        }
+        if (files && files.length > 0) {
+            html += '<div class="file-cards">';
+            for (const f of files) {
+                const sizeStr = f.size > 1024 ? `${(f.size/1024).toFixed(1)}KB` : `${f.size}B`;
+                const safeName = this.escapeHtml(f.name || '?');
+                const safeContent = f.content || '';
+                html += `<div class="file-card" data-filename="${safeName}" data-content="${this.escapeHtml(safeContent)}">
+                    <span class="file-card-icon">📎</span>
+                    <span class="file-card-name">${safeName}</span>
+                    <span class="file-card-size">${sizeStr}</span>
+                </div>`;
+            }
+            html += '</div>';
+        }
+        messageDiv.innerHTML = html;
+        
+        // 删除按钮
+        if (roundIndex >= 0) {
+            messageDiv.dataset.roundIndex = roundIndex;
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'round-delete-btn';
+            deleteBtn.textContent = '✕';
+            deleteBtn.title = '删除此轮对话';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const chatId = window.app?.chatManager?.currentChatId;
+                if (chatId && confirm('确定删除此轮对话？')) {
+                    window.app.chatManager.deleteRound(chatId, roundIndex);
+                }
+            });
+            messageDiv.appendChild(deleteBtn);
+        }
+        
+        // 文件卡片点击 → 弹窗显示内容
+        messageDiv.querySelectorAll('.file-card').forEach(card => {
+            card.addEventListener('click', () => {
+                this.showFileContentModal(
+                    card.dataset.filename,
+                    // data-content 已被 escapeHtml 处理，反转义
+                    new DOMParser().parseFromString(card.dataset.content, 'text/html').body.textContent || ''
+                );
+            });
+        });
+        
+        messagesDiv.appendChild(messageDiv);
+        
+        const container = document.getElementById('messages-container');
+        container.scrollTop = container.scrollHeight;
+        
+        return messageDiv;
+    }
+    
+    /**
+     * 显示文件附件内容弹窗
+     */
+    showFileContentModal(filename, content) {
+        let modal = document.getElementById('file-content-modal');
+        if (!modal) {
+            // 动态创建弹窗
+            modal = document.createElement('div');
+            modal.id = 'file-content-modal';
+            modal.className = 'tool-modal-overlay';
+            modal.innerHTML = `
+                <div class="tool-modal-box" style="max-width:800px;">
+                    <div class="tool-modal-header">
+                        <span id="file-modal-title">📎 文件</span>
+                        <button class="tool-modal-close file-modal-close">×</button>
+                    </div>
+                    <div id="file-modal-body" class="tool-modal-body" style="max-height:70vh;overflow-y:auto;"></div>
+                </div>`;
+            document.body.appendChild(modal);
+            
+            // 关闭事件
+            modal.querySelector('.file-modal-close').addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            });
+        }
+        
+        const title = modal.querySelector('#file-modal-title');
+        const body = modal.querySelector('#file-modal-body');
+        title.textContent = `📎 ${filename}`;
+        body.innerHTML = `<pre class="file-content-pre">${this.escapeHtml(content || '(空文件)')}</pre>`;
+        modal.style.display = 'flex';
+    }
+    
     updateMessage(messageDiv, newContent) {
         messageDiv.innerHTML = marked(newContent || '');
         

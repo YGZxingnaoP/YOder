@@ -534,6 +534,142 @@ html, body {
     color: #e55;
 }
 
+/* ═══════════════════════════════════════════ */
+/* 用户气泡中的文件附件卡片 */
+/* ═══════════════════════════════════════════ */
+
+.file-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.file-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(100, 150, 255, 0.12);
+    border: 1px solid rgba(100, 150, 255, 0.25);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 12px;
+    user-select: none;
+}
+
+.file-card:hover {
+    background: rgba(100, 150, 255, 0.22);
+    border-color: rgba(100, 150, 255, 0.45);
+    transform: translateY(-1px);
+}
+
+.file-card-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.file-card-name {
+    font-weight: 500;
+    color: rgba(50, 100, 200, 0.9);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-card-size {
+    color: rgba(0, 0, 0, 0.4);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+/* 文件内容弹窗 */
+.file-content-pre {
+    margin: 0;
+    padding: 12px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.6;
+    color: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 6px;
+    max-height: 65vh;
+    overflow-y: auto;
+}
+
+/* 暗色主题 — 文件卡片 */
+#app.dark-theme .file-card {
+    background: rgba(100, 150, 255, 0.15);
+    border-color: rgba(100, 150, 255, 0.2);
+}
+
+#app.dark-theme .file-card:hover {
+    background: rgba(100, 150, 255, 0.25);
+    border-color: rgba(100, 150, 255, 0.4);
+}
+
+#app.dark-theme .file-card-name {
+    color: rgba(150, 180, 255, 0.9);
+}
+
+#app.dark-theme .file-card-size {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+#app.dark-theme .file-cards {
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 自定义壁纸 — 文件卡片 */
+#app.custom-wallpaper .file-card {
+    background: rgba(100, 150, 255, 0.18);
+    border-color: rgba(100, 150, 255, 0.2);
+}
+
+#app.custom-wallpaper .file-card:hover {
+    background: rgba(100, 150, 255, 0.3);
+    border-color: rgba(100, 150, 255, 0.4);
+}
+
+#app.custom-wallpaper .file-card-name {
+    color: rgba(180, 200, 255, 0.9);
+}
+
+#app.custom-wallpaper .file-card-size {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#app.custom-wallpaper .file-cards {
+    border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+#app.custom-wallpaper.wp-light .file-card {
+    background: rgba(100, 150, 255, 0.12);
+    border-color: rgba(100, 150, 255, 0.2);
+}
+
+#app.custom-wallpaper.wp-light .file-card:hover {
+    background: rgba(100, 150, 255, 0.22);
+}
+
+#app.custom-wallpaper.wp-light .file-card-name {
+    color: rgba(50, 100, 200, 0.9);
+}
+
+#app.custom-wallpaper.wp-light .file-card-size {
+    color: rgba(0, 0, 0, 0.4);
+}
+
+#app.custom-wallpaper.wp-light .file-cards {
+    border-top-color: rgba(0, 0, 0, 0.08);
+}
+
 /* 文件树 */
 .file-tree-item {
     padding: 6px 8px;

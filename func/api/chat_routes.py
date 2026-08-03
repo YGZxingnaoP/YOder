@@ -257,9 +257,33 @@ async def chat(request: ChatRequest):
             else:
                 messages = []
 
-            # 4. 添加用户消息（带唯一ID）
+            # 4. 构建给 AI 的用户消息（文本 + 文件内容）
+            user_message_for_ai = request.message
+            user_files_data = request.files or []
+            if user_files_data:
+                file_sections = []
+                for f in user_files_data:
+                    file_sections.append(
+                        f"\n\n[附件文件: {f.get('name', '?')}]\n"
+                        f"--- 内容 ---\n{f.get('content', '')}\n--- 结束 ---"
+                    )
+                user_message_for_ai = request.message + "".join(file_sections) if request.message else "".join(file_sections).strip()
+
+            # 4.5 保存用户消息到历史（仅存文本，文件存为 metadata）
             user_msg_id = str(uuid.uuid4())[:8]
-            messages.append({"role": "user", "content": request.message, "id": user_msg_id})
+            user_msg_record = {"role": "user", "content": request.message, "id": user_msg_id}
+            if user_files_data:
+                # 存储不含 content 的轻量文件信息（前端渲染卡片用）
+                user_msg_record["files"] = [
+                    {"name": f.get("name", "?"), "size": f.get("size", 0)}
+                    for f in user_files_data
+                ]
+                # 额外存储完整内容供前端弹窗使用（通过 API 单独获取或内联存储）
+                user_msg_record["files_full"] = [
+                    {"name": f.get("name", "?"), "size": f.get("size", 0), "content": f.get("content", "")}
+                    for f in user_files_data
+                ]
+            messages.append(user_msg_record)
 
             # 5. 获取工具定义（过滤前端禁用的工具）
             disabled = set(request.disabled_tools or [])
@@ -348,6 +372,12 @@ async def chat(request: ChatRequest):
                 tool_executor=config.tool_executor,
             )
 
+            # 临时注入文件内容到用户消息，使 AI 能看到附件内容
+            user_msg_index = len(messages) - 1  # 记录用户消息的固定索引
+            clean_content = messages[user_msg_index]["content"]
+            if user_files_data:
+                messages[user_msg_index]["content"] = user_message_for_ai
+
             async for item in executor.execute(
                 messages=messages,
                 system_msg=system_msg,
@@ -360,6 +390,10 @@ async def chat(request: ChatRequest):
                 chat_file=chat_file,
             ):
                 yield item
+
+            # 恢复干净文本（用固定索引，避免 executor 追加消息后 messages[-1] 指向错误的元素）
+            if user_files_data:
+                messages[user_msg_index]["content"] = clean_content
 
             # 7. 处理停止信号
             if executor.result.get("stopped"):
