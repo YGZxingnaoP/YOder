@@ -173,6 +173,7 @@ echo [5/5] Building exe (this may take a few minutes)...
     --add-data "func;func" ^
     --add-data "wallpapers;wallpapers" ^
     --add-data "frontend\dist;frontend\dist" ^
+    --collect-data trafilatura ^
     --hidden-import=uvicorn ^
     --hidden-import=uvicorn.logging ^
     --hidden-import=uvicorn.loops ^

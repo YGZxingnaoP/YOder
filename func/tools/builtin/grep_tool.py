@@ -3,6 +3,7 @@ grep 工具 - 正则搜索文件内容
 """
 import os
 import re
+import fnmatch
 from typing import Dict, Any, List, Tuple
 from ..base import BaseTool
 
@@ -82,8 +83,8 @@ class GrepTool(BaseTool):
         else:
             search_dir = self.project_root
         
-        # 路径验证
-        if not search_dir.startswith(self.project_root):
+        # 路径验证: 必须在允许范围内
+        if not self.is_path_allowed(search_dir):
             return "错误: 禁止搜索项目目录外的文件"
         
         if not os.path.exists(search_dir):
@@ -100,8 +101,6 @@ class GrepTool(BaseTool):
         results: List[Tuple[str, int, str]] = []  # (file_path, line_num, line_content)
         
         try:
-            import fnmatch
-            
             for root, dirs, files in os.walk(search_dir, topdown=True):
                 # 过滤黑名单目录
                 dirs[:] = [d for d in dirs if d not in self.BLOCKED_DIRS]

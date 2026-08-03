@@ -55,8 +55,8 @@ class EditTool(BaseTool):
         
         abs_path = os.path.abspath(file_path)
         
-        # 1. 路径验证: 必须在项目目录内
-        if not abs_path.startswith(self.project_root):
+        # 1. 路径验证: 必须在允许范围内
+        if not self.is_path_allowed(abs_path):
             return "错误: 禁止修改项目目录外的文件"
         
         # 2. 文件存在性检查

@@ -2,6 +2,7 @@
 selenium_browse 工具 - 使用Edge浏览器分析网页(支持JavaScript渲染)
 """
 import os
+import sys
 import time
 from typing import Dict, Any
 from ..base import BaseTool
@@ -50,17 +51,33 @@ class SeleniumBrowseTool(BaseTool):
         self.driver_path = self._find_webdriver()
     
     def _find_webdriver(self) -> str:
-        """查找WebDriver路径"""
-        # 1. 项目根目录
-        project_driver = os.path.join(self.project_root, "msedgedriver.exe")
-        if os.path.exists(project_driver):
-            return project_driver
+        """查找WebDriver路径
+        优先级:
+          0. PyInstaller frozen: exe 同级目录（dist/ 下）
+          1. project_root 目录
+          2. 系统 PATH
+        """
+        search_dirs = []
         
-        # 2. 系统PATH
-        for path_dir in os.environ.get("PATH", "").split(os.pathsep):
-            driver_in_path = os.path.join(path_dir, "msedgedriver.exe")
-            if os.path.exists(driver_in_path):
-                return driver_in_path
+        # 0. frozen 环境: 优先 exe 所在目录
+        if getattr(sys, 'frozen', False):
+            exe_dir = os.path.dirname(sys.executable)
+            search_dirs.append(exe_dir)
+        
+        # 1. project_root（非空且不与 exe_dir 重复）
+        if self.project_root and self.project_root not in search_dirs:
+            search_dirs.append(self.project_root)
+        
+        # 2. 系统 PATH
+        search_dirs.extend(os.environ.get("PATH", "").split(os.pathsep))
+        
+        for d in search_dirs:
+            d = d.strip()
+            if not d:
+                continue
+            driver = os.path.join(d, "msedgedriver.exe")
+            if os.path.exists(driver):
+                return driver
         
         return ""
     

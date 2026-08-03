@@ -59,24 +59,7 @@ class WebBrowseTool(BaseTool):
             html = response.text
             
             # 2. 使用trafilatura提取正文(如果可用)
-            try:
-                import trafilatura
-                content = trafilatura.extract(
-                    html,
-                    include_comments=False,
-                    include_tables=True,
-                    include_images=False,
-                    include_links=False,
-                    include_formatting=False
-                )
-                
-                if not content:
-                    # 回退到简单提取
-                    content = self._simple_extract(html)
-                    
-            except ImportError:
-                # trafilatura未安装,使用简单提取
-                content = self._simple_extract(html)
+            content = self._extract_with_trafilatura(html)
             
             if not content:
                 return "错误: 无法提取网页内容"
@@ -101,6 +84,31 @@ class WebBrowseTool(BaseTool):
             return f"错误: HTTP错误 - {e.response.status_code} {e.response.reason}"
         except Exception as e:
             return f"网页浏览失败: {str(e)}"
+    
+    def _extract_with_trafilatura(self, html: str) -> str:
+        """
+        尝试用 trafilatura 提取正文。
+        任何异常（ImportError / 配置缺失 / 提取失败）都自动回退到 _simple_extract。
+        """
+        try:
+            import trafilatura
+            try:
+                content = trafilatura.extract(
+                    html,
+                    include_comments=False,
+                    include_tables=True,
+                    include_images=False,
+                    include_links=False,
+                    include_formatting=False
+                )
+                if content:
+                    return content
+            except Exception:
+                pass  # trafilatura 提取异常（如 settings.cfg 缺失）→ 回退
+        except ImportError:
+            pass  # trafilatura 未安装 → 回退
+        
+        return self._simple_extract(html)
     
     def _simple_extract(self, html: str) -> str:
         """简单HTML提取(trafilatura不可用时的回退方案)"""
