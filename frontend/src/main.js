@@ -17,6 +17,7 @@ class YOderApp {
         this.leftSidebarVisible = true;
         this.rightSidebarVisible = true;
         this.wallpaperType = 'webgl';
+        this._wpStatus = {};  // 壁纸状态缓存（从 status.json 读取）
         
         // 连点计数器（壁纸彩蛋）
         this.sendClickCount = 0;
@@ -51,8 +52,8 @@ class YOderApp {
         // 6. 初始化侧边栏状态
         this.updateSidebarLayout();
         
-        // 7. 恢复壁纸设置
-        this.restoreWallpaper();
+        // 7. 恢复壁纸设置（异步从 status.json 加载）
+        await this.restoreWallpaper();
         
         // 8. 加载对话列表并恢复上次对话
         await this.loadChatList();
@@ -192,7 +193,8 @@ class YOderApp {
                 const val = blurSlider.value;
                 document.getElementById('blur-value-display').textContent = `${val}px`;
                 document.documentElement.style.setProperty('--wp-blur', `${val}px`);
-                localStorage.setItem('wp-blur', val);
+                this._wpStatus.blur = val;
+                this._saveWallpaperStatus();
             });
         }
         if (opacitySlider) {
@@ -200,7 +202,8 @@ class YOderApp {
                 const val = opacitySlider.value;
                 document.getElementById('opacity-value-display').textContent = `${val}%`;
                 this.applyWallpaperOpacity(val);
-                localStorage.setItem('wp-opacity', val);
+                this._wpStatus.opacity = val;
+                this._saveWallpaperStatus();
             });
         }
         
@@ -375,16 +378,16 @@ class YOderApp {
         // 加载壁纸历史
         this.loadWallpaperHistory();
         
-        // 同步滑块到当前值
+        // 同步滑块到当前值（从缓存读取）
         const blurSlider = document.getElementById('wallpaper-blur-slider');
         const opacitySlider = document.getElementById('wallpaper-opacity-slider');
         if (blurSlider) {
-            const savedBlur = localStorage.getItem('wp-blur') || '8';
+            const savedBlur = this._wpStatus.blur || '8';
             blurSlider.value = savedBlur;
             document.getElementById('blur-value-display').textContent = `${savedBlur}px`;
         }
         if (opacitySlider) {
-            const savedOpacity = localStorage.getItem('wp-opacity') || '35';
+            const savedOpacity = this._wpStatus.opacity || '35';
             opacitySlider.value = savedOpacity;
             document.getElementById('opacity-value-display').textContent = `${savedOpacity}%`;
         }
@@ -409,7 +412,7 @@ class YOderApp {
             }
             
             section.style.display = 'block';
-            const currentFile = localStorage.getItem('wallpaper-file') || '';
+            const currentFile = this._wpStatus.file || '';
             
             list.innerHTML = wallpapers.map(wp => {
                 const isActive = currentFile === wp.filename;
@@ -463,10 +466,11 @@ class YOderApp {
             opt.classList.toggle('active', opt.dataset.wallpaper === 'custom');
         });
         
-        localStorage.setItem('wallpaper-type', 'custom');
-        localStorage.setItem('wallpaper-url', url);
-        localStorage.setItem('wallpaper-file', filename);
-        localStorage.removeItem('wallpaper-data');
+        this._wpStatus.type = 'custom';
+        this._wpStatus.url = url;
+        this._wpStatus.file = filename;
+        delete this._wpStatus.data;
+        this._saveWallpaperStatus();
         
         // 更新历史列表选中状态
         document.querySelectorAll('.wallpaper-history-item').forEach(item => {
@@ -511,7 +515,11 @@ class YOderApp {
         }
         
         // 保存偏好
-        localStorage.setItem('wallpaper-type', type);
+        this._wpStatus.type = type;
+        delete this._wpStatus.url;
+        delete this._wpStatus.file;
+        delete this._wpStatus.data;
+        this._saveWallpaperStatus();
         
         // 关闭模态框
         document.getElementById('wallpaper-modal').style.display = 'none';
@@ -547,7 +555,7 @@ class YOderApp {
                 opt.classList.toggle('active', opt.dataset.wallpaper === 'custom');
             });
             
-            localStorage.setItem('wallpaper-type', 'custom');
+            this._wpStatus.type = 'custom';
             
             // 上传壁纸到后端备份
             try {
@@ -556,16 +564,17 @@ class YOderApp {
                 const uploadRes = await fetch('/api/wallpapers/upload', { method: 'POST', body: formData });
                 if (uploadRes.ok) {
                     const uploadData = await uploadRes.json();
-                    localStorage.setItem('wallpaper-url', uploadData.url);
-                    localStorage.setItem('wallpaper-file', uploadData.filename);
-                    localStorage.removeItem('wallpaper-data');
+                    this._wpStatus.url = uploadData.url;
+                    this._wpStatus.file = uploadData.filename;
+                    delete this._wpStatus.data;
                 } else {
-                    // 上传失败，回退到localStorage存储 dataURL
-                    localStorage.setItem('wallpaper-data', dataUrl);
+                    // 上传失败，回退到存储 dataURL
+                    this._wpStatus.data = dataUrl;
                 }
             } catch (err) {
-                localStorage.setItem('wallpaper-data', dataUrl);
+                this._wpStatus.data = dataUrl;
             }
+            this._saveWallpaperStatus();
             
             // 刷新壁纸历史列表
             this.loadWallpaperHistory();
@@ -612,7 +621,8 @@ class YOderApp {
                     app.classList.remove('wp-light');
                 }
                 // 持久化结果
-                localStorage.setItem('wp-brightness', avgBrightness > 140 ? 'light' : 'dark');
+                this._wpStatus.brightness = avgBrightness > 140 ? 'light' : 'dark';
+                this._saveWallpaperStatus();
                 console.log(`壁纸亮度: ${avgBrightness.toFixed(1)} → ${avgBrightness > 140 ? '亮色' : '暗色'}`);
                 resolve(avgBrightness);
             };
@@ -631,7 +641,7 @@ class YOderApp {
      * 应用壁纸明暗类（从 localStorage 恢复，避免重复计算）
      */
     applyWallpaperTheme() {
-        const brightness = localStorage.getItem('wp-brightness') || 'dark';
+        const brightness = this._wpStatus.brightness || 'dark';
         const app = document.getElementById('app');
         if (brightness === 'light') {
             app.classList.add('wp-light');
@@ -645,14 +655,24 @@ class YOderApp {
     /**
      * 启动时恢复壁纸设置
      */
-    restoreWallpaper() {
-        const type = localStorage.getItem('wallpaper-type');
+    async restoreWallpaper() {
+        // 从 status.json 加载壁纸状态
+        try {
+            const res = await fetch('/api/wallpapers/status');
+            if (res.ok) {
+                this._wpStatus = await res.json();
+            }
+        } catch (e) {
+            console.warn('加载壁纸状态失败:', e);
+        }
+        
+        const type = this._wpStatus.type;
         if (!type) return;
         
         if (type === 'custom') {
             // 优先使用URL（服务端文件），回退到 dataURL
-            const url = localStorage.getItem('wallpaper-url');
-            const data = localStorage.getItem('wallpaper-data');
+            const url = this._wpStatus.url;
+            const data = this._wpStatus.data;
             const bgSrc = url || data;
             
             if (bgSrc) {
@@ -686,11 +706,22 @@ class YOderApp {
      * 恢复已保存的壁纸参数（模糊度、透明度）
      */
     restoreWallpaperParams() {
-        const blur = localStorage.getItem('wp-blur') || '8';
+        const blur = this._wpStatus.blur || '8';
         document.documentElement.style.setProperty('--wp-blur', `${blur}px`);
         
-        const opacity = localStorage.getItem('wp-opacity') || '35';
+        const opacity = this._wpStatus.opacity || '35';
         this.applyWallpaperOpacity(opacity);
+    }
+    
+    /**
+     * 将壁纸状态保存到 wallpapers/status.json
+     */
+    _saveWallpaperStatus() {
+        fetch('/api/wallpapers/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this._wpStatus)
+        }).catch(e => console.warn('保存壁纸状态失败:', e));
     }
     
     /**

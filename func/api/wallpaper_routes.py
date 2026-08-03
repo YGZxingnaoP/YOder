@@ -1,10 +1,11 @@
 """
 壁纸管理路由（/api/wallpapers）
 """
+import json
 import os
 import time
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse
 
 from func.api.config import BASE_DIR
@@ -12,6 +13,7 @@ from func.api.config import BASE_DIR
 router = APIRouter()
 
 WALLPAPER_DIR = os.path.join(BASE_DIR, "wallpapers")
+STATUS_PATH = os.path.join(WALLPAPER_DIR, "status.json")
 
 
 @router.get("/api/wallpapers")
@@ -52,6 +54,28 @@ async def upload_wallpaper(file: UploadFile = File(...)):
         "filename": saved_name,
         "url": f"/api/wallpapers/{saved_name}"
     }
+
+
+@router.get("/api/wallpapers/status")
+async def get_wallpaper_status():
+    """读取壁纸状态（从 wallpapers/status.json）"""
+    if not os.path.exists(STATUS_PATH):
+        return {}
+    try:
+        with open(STATUS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+@router.post("/api/wallpapers/status")
+async def save_wallpaper_status(request: Request):
+    """保存壁纸状态到 wallpapers/status.json"""
+    os.makedirs(WALLPAPER_DIR, exist_ok=True)
+    data = await request.json()
+    with open(STATUS_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return {"status": "success"}
 
 
 @router.get("/api/wallpapers/{filename}")

@@ -108,7 +108,7 @@ echo.
 echo if getattr^(sys, 'frozen', False^):
 echo     BASE_DIR = os.path.dirname^(sys.executable^)
 echo     BUNDLED_DIR = sys._MEIPASS
-echo     for d in ['config', 'wallpapers', os.path.join^('frontend', 'dist'^)]:
+echo     for d in ['wallpapers', os.path.join^('frontend', 'dist'^)]:
 echo         dst = os.path.join^(BASE_DIR, d^)
 echo         src = os.path.join^(BUNDLED_DIR, d^)
 echo         if not os.path.exists^(dst^) and os.path.exists^(src^):
@@ -171,7 +171,6 @@ echo [5/5] Building exe (this may take a few minutes)...
     --windowed ^
     --name "%APP_NAME%" ^
     --add-data "func;func" ^
-    --add-data "config;config" ^
     --add-data "wallpapers;wallpapers" ^
     --add-data "frontend\dist;frontend\dist" ^
     --hidden-import=uvicorn ^
@@ -249,10 +248,13 @@ if %errorlevel% neq 0 (
 :: Clean up launcher.py
 del /q "%~dp0launcher.py"
 
-:: Copy config + wallpapers next to exe (frontend already bundled via --add-data)
-if exist "%~dp0config" (
-    xcopy /E /I /Q "%~dp0config" "%DIST_DIR%\config" >nul
+:: Copy non-sensitive config files next to exe (skip info.json which contains API keys)
+if not exist "%DIST_DIR%\config" mkdir "%DIST_DIR%\config"
+for %%f in (tools.json last_conv.json) do (
+    if exist "%~dp0config\%%f" copy /Y "%~dp0config\%%f" "%DIST_DIR%\config\%%f" >nul
 )
+:: wallpapers (including status.json) already bundled and copied by launcher on first run
+:: Also copy wallpapers next to exe for immediate availability
 if exist "%~dp0wallpapers" (
     xcopy /E /I /Q "%~dp0wallpapers" "%DIST_DIR%\wallpapers" >nul
 )
