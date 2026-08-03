@@ -211,23 +211,38 @@ export class ChatManager {
                 signal: this.abortController.signal
             });
             
-            // 单气泡模式：整个assistant回合只有一个聊天气泡
-            let assistantDiv = null;
+            // 多气泡模式：每轮AI响应创建独立气泡（与刷新后样式一致）
+            let assistantDiv = null;   // 当前轮的气泡DOM
+            let thinkingText = '';     // 当前轮的思考文本
+            let contentText = '';      // 当前轮的内容文本
+            let lastToolBlock = null;  // 当前工具调用块DOM元素
+            let needNewBubble = false; // 工具调用完成后，下一轮需新气泡
                         
             // 流式接收响应
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let rawStream = '';
-            let thinkingText = '';    // 累积的思考文本
-            let contentText = '';     // 累积的内容文本
-            let hadToolCalls = false; // 整个对话是否发生过工具调用
-            let lastToolBlock = null; // 当前工具调用块DOM元素
                         
-            // 辅助函数：确保气泡已创建，首次创建立即渲染"思考中..."
+            // 辅助函数：智能创建气泡
+            // - 内容到达且无气泡 → 创建新气泡
+            // - 上一轮刚结束(needNewBubble) → 先关闭旧气泡，再创建新气泡
             const ensureBubble = () => {
+                if (needNewBubble) {
+                    // 先完成旧气泡
+                    if (assistantDiv) {
+                        if (thinkingText || contentText) {
+                            this.uiManager.updateMessageWithThinking(assistantDiv, thinkingText, contentText, false);
+                        } else {
+                            assistantDiv.remove();
+                        }
+                    }
+                    thinkingText = '';
+                    contentText = '';
+                    assistantDiv = null;
+                    needNewBubble = false;
+                }
                 if (!assistantDiv) {
                     assistantDiv = this.uiManager.addMessage('', 'assistant');
-                    // 立即渲染"思考中..."，避免空黑框
                     this.uiManager.updateMessageWithThinking(assistantDiv, '', '', true);
                 }
                 return assistantDiv;
@@ -240,11 +255,11 @@ export class ChatManager {
             let needsUpdate = false;
                         
             const doUpdate = () => {
-                if (!assistantDiv && !thinkingText && !contentText) {
+                // 没有任何内容就不渲染（也不创建气泡）
+                if (!thinkingText && !contentText) {
                     needsUpdate = false;
                     return;
                 }
-                // 没有content则仍在思考中（展开思考区）
                 const isStillThinking = !contentText;
                 this.uiManager.updateMessageWithThinking(
                     ensureBubble(), thinkingText, contentText, isStillThinking
@@ -289,16 +304,15 @@ export class ChatManager {
                     } else if (line.startsWith('\x03')) {
                         // 工具调用信息 → 侧边栏工具记录
                         if (updateTimer) { clearTimeout(updateTimer); updateTimer = null; }
-                        // 立即更新气泡：折叠思考区，显示已有内容
+                        // 结束当前气泡（如果已有内容），但不创建新气泡
                         if (assistantDiv) {
                             this.uiManager.updateMessageWithThinking(assistantDiv, thinkingText, contentText, false);
                         }
-                        hadToolCalls = true;
-                                    
+                        // 保存快照供侧边栏卡片使用
+                        const thinkSnap = thinkingText;
+                        const contentSnap = contentText;
                         try {
                             const tcInfo = JSON.parse(line.slice(1));
-                            const thinkSnap = thinkingText;
-                            const contentSnap = contentText;
                             const card = this.uiManager.addToolRecord(tcInfo.name, tcInfo.arguments, thinkSnap, contentSnap);
                             lastToolBlock = card;
                         } catch (e) {
@@ -314,6 +328,8 @@ export class ChatManager {
                                 console.error('解析工具结果失败:', e);
                             }
                         }
+                        // 工具轮结束，下一轮AI响应创建新气泡
+                        needNewBubble = true;
                     } else {
                         // 无前缀内容，确保气泡已创建
                         ensureBubble();
@@ -342,10 +358,14 @@ export class ChatManager {
                 }
             }
                         
-            // 最终更新（确保所有内容都渲染）
-            if (assistantDiv || thinkingText || contentText) {
-                ensureBubble();
-                this.uiManager.updateMessageWithThinking(assistantDiv, thinkingText, contentText, false);
+            // 最终更新
+            if (needNewBubble) {
+                // 最后一轮以工具调用结束，旧气泡已在\x03时完成渲染
+                // 不创建新气泡，不重复渲染
+            } else if (thinkingText || contentText) {
+                this.uiManager.updateMessageWithThinking(ensureBubble(), thinkingText, contentText, false);
+            } else if (assistantDiv) {
+                assistantDiv.remove();
             }
             
         } catch (error) {

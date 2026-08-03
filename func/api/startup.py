@@ -5,7 +5,7 @@ from func.tools.registry import ToolRegistry
 from func.tools.executor import ToolExecutor
 from func.tools.builtin import (
     ReadTool, WriteTool, EditTool, GlobTool, GrepTool, BashTool,
-    WebSearchTool, WebBrowseTool, EdgeCheckTool, TodoListTool
+    WebSearchTool, WebBrowseTool, SeleniumBrowseTool, EdgeCheckTool, TodoListTool
 )
 from func.api import config
 
@@ -17,7 +17,7 @@ def init_tools():
     # 注册所有内置工具
     for tool_cls in (
         ReadTool, WriteTool, EditTool, GlobTool, GrepTool, BashTool,
-        WebSearchTool, WebBrowseTool, EdgeCheckTool, TodoListTool,
+        WebSearchTool, WebBrowseTool, SeleniumBrowseTool, EdgeCheckTool, TodoListTool,
     ):
         config.tool_registry.register(tool_cls)
 

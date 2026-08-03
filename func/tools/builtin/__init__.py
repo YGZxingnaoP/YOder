@@ -9,6 +9,7 @@ from .grep_tool import GrepTool
 from .bash_tool import BashTool
 from .web_search_tool import WebSearchTool
 from .web_browse_tool import WebBrowseTool
+from .selenium_browse_tool import SeleniumBrowseTool
 from .edge_check_tool import EdgeCheckTool
 from .todolist_tool import TodoListTool
 
@@ -21,6 +22,7 @@ __all__ = [
     'BashTool',
     'WebSearchTool',
     'WebBrowseTool',
+    'SeleniumBrowseTool',
     'EdgeCheckTool',
     'TodoListTool'
 ]
